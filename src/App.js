@@ -1,0 +1,2941 @@
+import React, { useState, useEffect, useRef } from "react";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import styled, { css, keyframes } from "styled-components";
+import { Line } from 'react-chartjs-2';
+import 'chart.js/auto';
+
+/* Utility helpers */
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const formatOvers = (balls) => `${Math.floor(balls / 6)}.${balls % 6}`;
+
+// Responsive breakpoints
+const breakpoints = {
+  mobile: '480px',
+  tablet: '768px',
+  desktop: '1024px'
+};
+
+// Media query helper
+const media = {
+  mobile: (styles) => css`@media (max-width: ${breakpoints.mobile}) { ${styles} }`,
+  tablet: (styles) => css`@media (max-width: ${breakpoints.tablet}) { ${styles} }`,
+  desktop: (styles) => css`@media (min-width: ${breakpoints.desktop}) { ${styles} }`
+};
+
+// Animation for ball delivery
+const ballAnimation = keyframes`
+  0% { transform: translateX(0) rotate(0deg); }
+  50% { transform: translateX(100px) rotate(180deg); }
+  100% { transform: translateX(0) rotate(360deg); }
+`;
+
+// Animation for milestone highlight
+const milestoneAnimation = keyframes`
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+`;
+
+// Styled Components with Cricket Theme (No Blue) and Full Responsiveness
+const AppContainer = styled.div`
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: ${props => props.darkMode ? '#e0e0e0' : '#333'};
+  background-color: ${props => props.darkMode ? '#1a1a1a' : '#f8f9fa'};
+  min-height: 100vh;
+  transition: all 0.3s ease;
+`;
+
+const Header = styled.header`
+  background: linear-gradient(135deg, #2d5016, #4a7c28);
+  color: white;
+  padding: 1rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  
+  ${media.desktop(css`
+    padding: 1rem 2rem;
+  `)}
+`;
+
+const Logo = styled.div`
+  font-size: 1.5rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  
+  ${media.desktop(css`
+    font-size: 1.8rem;
+  `)}
+`;
+
+const DarkModeToggle = styled.button`
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+`;
+
+const MainContent = styled.main`
+  padding: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  
+  ${media.desktop(css`
+    padding: 2rem;
+  `)}
+`;
+
+const Card = styled.div`
+  background: ${props => props.darkMode ? '#2a2a2a' : 'white'};
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  transition: all 0.3s ease;
+  
+  ${media.desktop(css`
+    padding: 1.5rem;
+  `)}
+`;
+
+const CardTitle = styled.h2`
+  margin-top: 0;
+  color: ${props => props.darkMode ? '#4a7c28' : '#2d5016'};
+  border-bottom: 2px solid ${props => props.darkMode ? '#444' : '#eaeaea'};
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  
+  ${media.desktop(css`
+    font-size: 1.4rem;
+  `)}
+`;
+
+const Button = styled.button`
+  background: ${props => props.primary ? '#4a7c28' : '#6c757d'};
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  margin: 0.25rem;
+  font-size: 0.9rem;
+  min-height: 44px; // Minimum touch target size
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  
+  ${media.desktop(css`
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+  `)}
+  
+  &:hover {
+    background: ${props => props.primary ? '#5a8c38' : '#5a6268'};
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+`;
+
+const Input = styled.input`
+  padding: 0.75rem;
+  border: 1px solid ${props => props.darkMode ? '#555' : '#ced4da'};
+  border-radius: 4px;
+  width: 100%;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  min-height: 44px; // Minimum touch target size
+  background-color: ${props => props.darkMode ? '#333' : 'white'};
+  color: ${props => props.darkMode ? '#e0e0e0' : '#333'};
+  
+  &:focus {
+    outline: none;
+    border-color: #4a7c28;
+    box-shadow: 0 0 0 2px rgba(74, 124, 40, 0.25);
+  }
+`;
+
+const Select = styled.select`
+  padding: 0.75rem;
+  border: 1px solid ${props => props.darkMode ? '#555' : '#ced4da'};
+  border-radius: 4px;
+  width: 100%;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  min-height: 44px; // Minimum touch target size
+  background-color: ${props => props.darkMode ? '#333' : 'white'};
+  color: ${props => props.darkMode ? '#e0e0e0' : '#333'};
+  
+  &:focus {
+    outline: none;
+    border-color: #4a7c28;
+    box-shadow: 0 0 0 2px rgba(74, 124, 40, 0.25);
+  }
+`;
+
+const FormRow = styled.div`
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  
+  ${media.mobile(css`
+    flex-direction: column;
+    gap: 0.5rem;
+  `)}
+`;
+
+const FormColumn = styled.div`
+  flex: 1;
+  min-width: 200px;
+`;
+
+const TableContainer = styled.div`
+  overflow-x: auto;
+  margin-bottom: 1rem;
+  -webkit-overflow-scrolling: touch; // For smooth scrolling on iOS
+`;
+
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+  min-width: 600px; // Ensure table doesn't get too cramped
+  
+  th, td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid ${props => props.darkMode ? '#444' : '#dee2e6'};
+    
+    ${media.mobile(css`
+      padding: 0.5rem;
+      font-size: 0.9rem;
+    `)}
+  }
+  
+  th {
+    background-color: ${props => props.darkMode ? '#333' : '#f8f9fa'};
+    font-weight: 600;
+    color: ${props => props.darkMode ? '#e0e0e0' : '#495057'};
+  }
+  
+  tr:nth-child(even) {
+    background-color: ${props => props.darkMode ? '#2a2a2a' : '#f8f9fa'};
+  }
+  
+  tr:hover {
+    background-color: ${props => props.darkMode ? '#333' : '#e9ecef'};
+  }
+`;
+
+const ScoreDisplay = styled.div`
+  background: linear-gradient(135deg, #2d5016, #4a7c28);
+  color: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1.5rem;
+  
+  ${media.mobile(css`
+    padding: 1rem;
+  `)}
+`;
+
+const ScoreMain = styled.div`
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin: 0.5rem 0;
+  animation: ${props => props.highlight ? milestoneAnimation : 'none'} 1s ease-in-out;
+  
+  ${media.desktop(css`
+    font-size: 3rem;
+  `)}
+`;
+
+const ScoreDetails = styled.div`
+  font-size: 1rem;
+  opacity: 0.9;
+  
+  ${media.desktop(css`
+    font-size: 1.2rem;
+  `)}
+`;
+
+const RunRateDisplay = styled.div`
+  display: flex;
+  justify-content: space-around;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+`;
+
+const RunRateItem = styled.div`
+  text-align: center;
+`;
+
+const RunRateLabel = styled.div`
+  font-size: 0.8rem;
+  opacity: 0.8;
+`;
+
+const RunRateValue = styled.div`
+  font-size: 1.2rem;
+  font-weight: bold;
+`;
+
+const Modal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+`;
+
+const ModalContent = styled.div`
+  background: ${props => props.darkMode ? '#2a2a2a' : 'white'};
+  border-radius: 8px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  
+  ${media.desktop(css`
+    padding: 2rem;
+    width: 90%;
+  `)}
+`;
+
+const ModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+`;
+
+const ModalTitle = styled.h2`
+  margin: 0;
+  color: ${props => props.darkMode ? '#4a7c28' : '#2d5016'};
+  font-size: 1.2rem;
+  
+  ${media.desktop(css`
+    font-size: 1.4rem;
+  `)}
+`;
+
+const CloseButton = styled.button`
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: ${props => props.darkMode ? '#e0e0e0' : '#6c757d'};
+  min-height: 44px;
+  min-width: 44px;
+  
+  &:hover {
+    color: ${props => props.darkMode ? '#fff' : '#343a40'};
+  }
+`;
+
+const ActionButtons = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  
+  ${media.mobile(css`
+    justify-content: center;
+  `)}
+`;
+
+const RunButton = styled(Button)`
+  background: ${props => {
+    switch(props.run) {
+      case 0: return '#6c757d';
+      case 1: return '#28a745';
+      case 2: return '#17a2b8';
+      case 3: return '#ffc107';
+      case 4: return '#fd7e14';
+      case 6: return '#dc3545';
+      default: return '#6c757d';
+    }
+  }};
+  
+  min-width: 50px;
+  font-weight: bold;
+  flex: 1;
+  animation: ${props => props.animate ? ballAnimation : 'none'} 1s ease-in-out;
+  
+  ${media.desktop(css`
+    flex: none;
+  `)}
+`;
+
+const WicketButton = styled(Button)`
+  background: #dc3545;
+  flex: 1;
+  
+  ${media.desktop(css`
+    flex: none;
+  `)}
+`;
+
+const ExtrasButton = styled(Button)`
+  background: #6f42c1;
+  flex: 1;
+  
+  ${media.desktop(css`
+    flex: none;
+  `)}
+`;
+
+const StatusBadge = styled.span`
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border-radius: 4px;
+  background: ${props => {
+    switch(props.status) {
+      case 'batting': return '#28a745';
+      case 'out': return '#dc3545';
+      case 'retired': return '#ffc107';
+      default: return '#6c757d';
+    }
+  }};
+  color: white;
+`;
+
+const CurrentPlayer = styled.tr`
+  background-color: ${props => props.darkMode ? '#333' : '#e7f3ff'} !important;
+`;
+
+const TeamInfo = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+`;
+
+const MatchInfo = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: ${props => props.darkMode ? '#aaa' : '#6c757d'};
+  
+  ${media.mobile(css`
+    font-size: 0.8rem;
+  `)}
+`;
+
+const InfoItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+`;
+
+// Team logo display
+const TeamLogo = styled.img`
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 0.5rem;
+`;
+
+const TeamNameWithLogo = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+// Initial Players Display Component
+const InitialPlayersDisplay = styled.div`
+  background: ${props => props.darkMode ? '#2a2a2a' : '#f0f8e8'};
+  border: 1px solid ${props => props.darkMode ? '#444' : '#d4e8c4'};
+  border-radius: 6px;
+  padding: 1rem;
+  margin-top: 1rem;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+`;
+
+const PlayerRole = styled.div`
+  text-align: center;
+  flex: 1;
+  min-width: 100px;
+  
+  .role-label {
+    font-size: 0.8rem;
+    color: ${props => props.darkMode ? '#aaa' : '#4a7c28'};
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+  
+  .player-name {
+    font-size: 1rem;
+    font-weight: 500;
+    color: ${props => props.darkMode ? '#e0e0e0' : '#333'};
+  }
+`;
+
+// Enhanced Wicket Modal
+const WicketModal = styled(ModalContent)`
+  border-top: 5px solid #dc3545;
+`;
+
+const WicketHeader = styled.div`
+  background: linear-gradient(135deg, #dc3545, #c82333);
+  color: white;
+  padding: 1rem;
+  margin: -1.5rem -1.5rem 1.5rem -1.5rem;
+  border-radius: 8px 8px 0 0;
+  text-align: center;
+  
+  ${media.desktop(css`
+    margin: -2rem -2rem 1.5rem -2rem;
+    padding: 1rem;
+  `)}
+`;
+
+const WicketFormSection = styled.div`
+  background: ${props => props.darkMode ? '#333' : '#fff5f5'};
+  border: 1px solid ${props => props.darkMode ? '#555' : '#f8d7da'};
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+`;
+
+const WicketSectionTitle = styled.h4`
+  color: ${props => props.darkMode ? '#e0e0e0' : '#721c24'};
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+`;
+
+const WicketButtonGroup = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+`;
+
+const WicketSubmitButton = styled(Button)`
+  background: #dc3545;
+  flex: 1;
+  
+  ${media.desktop(css`
+    flex: none;
+  `)}
+  
+  &:hover {
+    background: #c82333;
+  }
+`;
+
+const WicketCancelButton = styled(Button)`
+  background: #6c757d;
+  flex: 1;
+  
+  ${media.desktop(css`
+    flex: none;
+  `)}
+  
+  &:hover {
+    background: #5a6268;
+  }
+`;
+
+// Mobile-optimized scorecard
+const MobileScorecard = styled.div`
+  ${media.mobile(css`
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  `)}
+`;
+
+const MobileCard = styled(Card)`
+  ${media.mobile(css`
+    margin-bottom: 1rem;
+  `)}
+`;
+
+// Partnership display
+const PartnershipDisplay = styled.div`
+  background: ${props => props.darkMode ? '#2a2a2a' : '#f8f9fa'};
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-left: 4px solid #4a7c28;
+`;
+
+const PartnershipTitle = styled.h4`
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: ${props => props.darkMode ? '#e0e0e0' : '#333'};
+`;
+
+const PartnershipDetails = styled.div`
+  display: flex;
+  justify-content: space-between;
+`;
+
+// Chart container
+const ChartContainer = styled.div`
+  height: 200px;
+  margin: 1rem 0;
+`;
+
+// Milestone notification
+const MilestoneNotification = styled.div`
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #4a7c28, #2d5016);
+  color: white;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1001;
+  animation: ${milestoneAnimation} 1s ease-in-out;
+  max-width: 300px;
+`;
+
+// Bowler selection modal
+const BowlerSelectionModal = styled(ModalContent)`
+  border-top: 5px solid #4a7c28;
+`;
+
+const BowlerSelectionHeader = styled.div`
+  background: linear-gradient(135deg, #4a7c28, #2d5016);
+  color: white;
+  padding: 1rem;
+  margin: -1.5rem -1.5rem 1.5rem -1.5rem;
+  border-radius: 8px 8px 0 0;
+  text-align: center;
+  
+  ${media.desktop(css`
+    margin: -2rem -2rem 1.5rem -2rem;
+    padding: 1rem;
+  `)}
+`;
+
+const BowlerList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+`;
+
+const BowlerOption = styled.div`
+  padding: 0.75rem;
+  border: 1px solid ${props => props.darkMode ? '#555' : '#ced4da'};
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background-color: ${props => props.darkMode ? '#333' : '#f8f9fa'};
+  }
+  
+  ${props => props.selected && css`
+    background-color: #4a7c28;
+    color: white;
+    border-color: #4a7c28;
+  `}
+`;
+
+// Manual runs modal
+const ManualRunsModal = styled(ModalContent)`
+  border-top: 5px solid #17a2b8;
+`;
+
+const ManualRunsHeader = styled.div`
+  background: linear-gradient(135deg, #17a2b8, #117a8b);
+  color: white;
+  padding: 1rem;
+  margin: -1.5rem -1.5rem 1.5rem -1.5rem;
+  border-radius: 8px 8px 0 0;
+  text-align: center;
+  
+  ${media.desktop(css`
+    margin: -2rem -2rem 1.5rem -2rem;
+    padding: 1rem;
+  `)}
+`;
+
+const RunsButtonGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+`;
+
+const RunsButton = styled(Button)`
+  min-height: 60px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  
+  ${props => props.negative && css`
+    background: #dc3545;
+    
+    &:hover {
+      background: #c82333;
+    }
+  `}
+`;
+
+// File upload for team logos
+const FileUpload = styled.div`
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  width: 100%;
+`;
+
+const FileUploadInput = styled.input`
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+`;
+
+const FileUploadLabel = styled.label`
+  display: block;
+  padding: 0.75rem;
+  border: 1px dashed ${props => props.darkMode ? '#555' : '#ced4da'};
+  border-radius: 4px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background-color: ${props => props.darkMode ? '#333' : '#f8f9fa'};
+  }
+`;
+
+const TeamSetupContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+`;
+
+const TeamLogoContainer = styled.div`
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: ${props => props.darkMode ? '#333' : '#f0f0f0'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+`;
+
+const TeamLogoPreview = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+`;
+
+const TeamDetails = styled.div`
+  flex: 1;
+`;
+
+export default function App() {
+  // All the existing state variables remain the same
+  const [page, setPage] = useState("login");
+  const [phone, setPhone] = useState("");
+  
+  // Dark mode state
+  const [darkMode, setDarkMode] = useState(false);
+  
+  // Team logos
+  const [team1Logo, setTeam1Logo] = useState("");
+  const [team2Logo, setTeam2Logo] = useState("");
+  
+  // Animation states
+  const [animateBall, setAnimateBall] = useState(false);
+  const [highlightMilestone, setHighlightMilestone] = useState(false);
+  const [milestoneNotification, setMilestoneNotification] = useState(null);
+  
+  // Partnership tracking
+  const [currentPartnership, setCurrentPartnership] = useState({
+    batsman1: "",
+    batsman2: "",
+    runs: 0,
+    balls: 0,
+    startOver: 0,
+    startBall: 0
+  });
+  
+  // Run rate tracking
+  const [currentRunRate, setCurrentRunRate] = useState(0);
+  const [requiredRunRate, setRequiredRunRate] = useState(0);
+  
+  // Chart data
+  const [runRateData, setRunRateData] = useState({
+    labels: [],
+    datasets: [
+      {
+        label: 'Run Rate',
+        data: [],
+        fill: false,
+        backgroundColor: '#4a7c28',
+        borderColor: '#4a7c28',
+      }
+    ]
+  });
+  
+  // Bowler selection modal
+  const [bowlerSelectionOpen, setBowlerSelectionOpen] = useState(false);
+  const [savedBowlers, setSavedBowlers] = useState([]);
+  const [newBowlerName, setNewBowlerName] = useState("");
+  
+  // Manual runs modal
+  const [manualRunsOpen, setManualRunsOpen] = useState(false);
+  
+  // Player squads
+  const [team1Squad, setTeam1Squad] = useState([]);
+  const [team2Squad, setTeam2Squad] = useState([]);
+  const [squadModalOpen, setSquadModalOpen] = useState(false);
+  const [currentSquadTeam, setCurrentSquadTeam] = useState("");
+  const [newPlayerName, setNewPlayerName] = useState("");
+
+  // setup fields
+  const [team1, setTeam1] = useState("");
+  const [team2, setTeam2] = useState("");
+  const [tossWinner, setTossWinner] = useState("");
+  const [decision, setDecision] = useState("");
+  const [oversLimit, setOversLimit] = useState("");
+  const [ground, setGround] = useState("");
+  const [date, setDate] = useState("");
+  const [setupStriker, setSetupStriker] = useState("");
+  const [setupNonStriker, setSetupNonStriker] = useState("");
+  const [setupBowler, setSetupBowler] = useState("");
+
+  // match state
+  const [totalRuns, setTotalRuns] = useState(0);
+  const [totalWickets, setTotalWickets] = useState(0);
+  const [balls, setBalls] = useState(0);
+  const [batsmen, setBatsmen] = useState({});
+  const [bowlerStats, setBowlerStats] = useState({});
+  const [striker, setStriker] = useState("");
+  const [nonStriker, setNonStriker] = useState("");
+  const [currentBowler, setCurrentBowler] = useState("");
+  const [history, setHistory] = useState([]);
+  const [oversLimitNum, setOversLimitNum] = useState(null);
+
+  // innings & teams
+  const [innings, setInnings] = useState(1);
+  const [battingTeam, setBattingTeam] = useState("");
+  const [firstInningsScore, setFirstInningsScore] = useState(null);
+  const [target, setTarget] = useState(null);
+
+  // store full innings details for final summary
+  const [firstInningsDetail, setFirstInningsDetail] = useState(null);
+  const [secondInningsDetail, setSecondInningsDetail] = useState(null);
+  const [finalModalOpen, setFinalModalOpen] = useState(false);
+
+  // extras
+  const [extras, setExtras] = useState(0);
+
+  // pending negative runs (for modal)
+  const [pendingNegative, setPendingNegative] = useState(null);
+
+  // wicket panel
+  const [wicketPanelOpen, setWicketPanelOpen] = useState(false);
+  const [wicketForm, setWicketForm] = useState({
+    outName: "",
+    method: "Bowled",
+    helper: "",
+    newBatsman: "",
+    isRunOut: false,
+    runOutWhichBatter: "Striker",
+    runOutEnd: "Striker End",
+    runsBefore: 0,
+  });
+
+  // second innings start modal
+  const [startSecondOpen, setStartSecondOpen] = useState(false);
+  const [secondStriker, setSecondStriker] = useState("");
+  const [secondNonStriker, setSecondNonStriker] = useState("");
+  const [secondBowler, setSecondBowler] = useState("");
+
+  // Chart options
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Run Rate'
+        }
+      },
+      x: {
+        title: {
+          display: true,
+          text: 'Overs'
+        }
+      }
+    }
+  };
+
+  // Handle team logo upload
+  const handleTeamLogoUpload = (team, e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (team === 1) {
+          setTeam1Logo(reader.result);
+        } else {
+          setTeam2Logo(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle dark mode toggle
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
+    localStorage.setItem('darkMode', !darkMode);
+  };
+
+  // Check for saved dark mode preference
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    setDarkMode(savedDarkMode);
+  }, []);
+
+  // Check for milestones
+  const checkMilestone = (runs, wickets) => {
+    // Check for batting milestones
+    if (batsmen[striker]) {
+      const batsmanRuns = batsmen[striker].runs;
+      if (batsmanRuns === 50 || batsmanRuns === 100) {
+        setMilestoneNotification({
+          type: 'batting',
+          player: striker,
+          milestone: batsmanRuns === 50 ? 'Half Century' : 'Century',
+          runs: batsmanRuns
+        });
+        setHighlightMilestone(true);
+        setTimeout(() => setHighlightMilestone(false), 1000);
+        setTimeout(() => setMilestoneNotification(null), 3000);
+      }
+    }
+    
+    // Check for bowling milestones
+    if (bowlerStats[currentBowler]) {
+      const bowlerWickets = bowlerStats[currentBowler].wickets;
+      if (bowlerWickets === 5) {
+        setMilestoneNotification({
+          type: 'bowling',
+          player: currentBowler,
+          milestone: 'Five Wicket Haul',
+          wickets: bowlerWickets
+        });
+        setHighlightMilestone(true);
+        setTimeout(() => setHighlightMilestone(false), 1000);
+        setTimeout(() => setMilestoneNotification(null), 3000);
+      }
+    }
+  };
+
+  // Calculate current run rate
+  const calculateRunRate = (runs, balls) => {
+    if (balls === 0) return 0;
+    return (runs / (balls / 6)).toFixed(2);
+  };
+
+  // Calculate required run rate for second innings
+  const calculateRequiredRunRate = () => {
+    if (innings !== 2 || !target || !oversLimitNum) return 0;
+    const remainingRuns = target - totalRuns;
+    const remainingBalls = oversLimitNum * 6 - balls;
+    if (remainingBalls <= 0) return 0;
+    return ((remainingRuns / (remainingBalls / 6))).toFixed(2);
+  };
+
+  // Update partnership
+  const updatePartnership = () => {
+    if (!striker || !nonStriker) return;
+    
+    // Check if partnership needs to be reset
+    if (currentPartnership.batsman1 !== striker || currentPartnership.batsman2 !== nonStriker) {
+      // Calculate previous partnership stats
+      const prevRuns = currentPartnership.runs;
+      const prevBalls = currentPartnership.balls;
+      
+      // Reset partnership
+      setCurrentPartnership({
+        batsman1: striker,
+        batsman2: nonStriker,
+        runs: 0,
+        balls: 0,
+        startOver: Math.floor(balls / 6),
+        startBall: balls % 6
+      });
+      
+      // Store previous partnership if it had runs
+      if (prevRuns > 0) {
+        // You could store this in a partnerships array if needed
+      }
+    }
+  };
+
+  // Update run rate chart
+  const updateRunRateChart = () => {
+    const over = Math.floor(balls / 6) + (balls % 6 > 0 ? 0.1 : 0);
+    const runRate = calculateRunRate(totalRuns, balls);
+    
+    setRunRateData(prevData => {
+      const newLabels = [...prevData.labels, over];
+      const newData = [...prevData.datasets[0].data, runRate];
+      
+      // Keep only last 20 overs for readability
+      if (newLabels.length > 20) {
+        newLabels.shift();
+        newData.shift();
+      }
+      
+      return {
+        labels: newLabels,
+        datasets: [
+          {
+            ...prevData.datasets[0],
+            data: newData
+          }
+        ]
+      };
+    });
+  };
+
+  // Add bowler to saved list
+  const addBowler = () => {
+    if (newBowlerName.trim() && !savedBowlers.includes(newBowlerName.trim())) {
+      setSavedBowlers([...savedBowlers, newBowlerName.trim()]);
+      setNewBowlerName("");
+    }
+  };
+
+  // Select bowler from saved list
+  const selectBowler = (bowlerName) => {
+    setCurrentBowler(bowlerName);
+    setBowlerSelectionOpen(false);
+  };
+
+  // Add player to squad
+  const addPlayerToSquad = () => {
+    if (newPlayerName.trim()) {
+      if (currentSquadTeam === 1) {
+        setTeam1Squad([...team1Squad, newPlayerName.trim()]);
+      } else {
+        setTeam2Squad([...team2Squad, newPlayerName.trim()]);
+      }
+      setNewPlayerName("");
+    }
+  };
+
+  // Open squad modal for specific team
+  const openSquadModal = (team) => {
+    setCurrentSquadTeam(team);
+    setSquadModalOpen(true);
+  };
+
+  // Select player from squad
+  const selectPlayerFromSquad = (playerName, role) => {
+    if (role === 'striker') {
+      setSetupStriker(playerName);
+    } else if (role === 'nonStriker') {
+      setSetupNonStriker(playerName);
+    } else if (role === 'bowler') {
+      setSetupBowler(playerName);
+    }
+    setSquadModalOpen(false);
+  };
+
+  // Record delivery with animation
+  const recordDeliveryWithAnimation = (deliveryData) => {
+    setAnimateBall(true);
+    recordDelivery(deliveryData);
+    setTimeout(() => setAnimateBall(false), 1000);
+  };
+
+  // All the existing functions remain the same
+  const pushSnapshot = () => {
+    const snap = {
+      totalRuns,
+      totalWickets,
+      balls,
+      batsmen: clone(batsmen),
+      bowlerStats: clone(bowlerStats),
+      striker,
+      nonStriker,
+      currentBowler,
+      oversLimitNum,
+      extras,
+      pendingNegative,
+      innings,
+      battingTeam,
+      firstInningsScore,
+      target,
+    };
+    setHistory((h) => [...h, snap]);
+  };
+
+  const restoreSnapshot = (snap) => {
+    setTotalRuns(snap.totalRuns);
+    setTotalWickets(snap.totalWickets);
+    setBalls(snap.balls);
+    setBatsmen(snap.batsmen);
+    setBowlerStats(snap.bowlerStats);
+    setStriker(snap.striker);
+    setNonStriker(snap.nonStriker);
+    setCurrentBowler(snap.currentBowler);
+    setOversLimitNum(snap.oversLimitNum);
+    setExtras(snap.extras || 0);
+    setPendingNegative(snap.pendingNegative || null);
+    setInnings(snap.innings || 1);
+    setBattingTeam(snap.battingTeam || "");
+    setFirstInningsScore(snap.firstInningsScore || null);
+    setTarget(snap.target || null);
+  };
+
+  const ensureBatsman = (name, copy) => {
+    if (!name) return;
+    if (!copy[name]) {
+      copy[name] = { name, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
+    }
+  };
+
+  const ensureBowler = (name, copy) => {
+    if (!name) return;
+    if (!copy[name]) {
+      copy[name] = { balls: 0, runs: 0, wickets: 0 };
+    }
+  };
+
+  const startMatch = () => {
+    if (!team1 || !team2) {
+      alert("Enter both team names");
+      return;
+    }
+    if (!setupStriker || !setupNonStriker || !setupBowler) {
+      alert("Enter striker, non-striker and bowler names");
+      return;
+    }
+
+    // determine batting team using tossWinner + decision if available
+    let firstBatting = team1;
+    if (tossWinner && decision) {
+      if (decision === "Batting") firstBatting = tossWinner;
+      else {
+        // bowling chosen by toss winner -> other team bats
+        firstBatting = tossWinner === team1 ? team2 : team1;
+      }
+    }
+
+    const initialB = {};
+    initialB[setupStriker] = { name: setupStriker, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
+    initialB[setupNonStriker] = { name: setupNonStriker, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
+    const initialBow = {};
+    initialBow[setupBowler] = { balls: 0, runs: 0, wickets: 0 };
+
+    setBatsmen(initialB);
+    setBowlerStats(initialBow);
+    setStriker(setupStriker);
+    setNonStriker(setupNonStriker);
+    setCurrentBowler(setupBowler);
+    setTotalRuns(0);
+    setTotalWickets(0);
+    setBalls(0);
+    setHistory([]);
+    setExtras(0);
+    setPendingNegative(null);
+    setOversLimitNum(oversLimit ? parseInt(oversLimit, 10) : null);
+    setInnings(1);
+    setBattingTeam(firstBatting);
+    setFirstInningsScore(null);
+    setTarget(null);
+    setFirstInningsDetail(null);
+    setSecondInningsDetail(null);
+    setFinalModalOpen(false);
+    
+    // Initialize partnership
+    setCurrentPartnership({
+      batsman1: setupStriker,
+      batsman2: setupNonStriker,
+      runs: 0,
+      balls: 0,
+      startOver: 0,
+      startBall: 0
+    });
+    
+    // Initialize chart
+    setRunRateData({
+      labels: [0],
+      datasets: [
+        {
+          label: 'Run Rate',
+          data: [0],
+          fill: false,
+          backgroundColor: '#4a7c28',
+          borderColor: '#4a7c28',
+        }
+      ]
+    });
+    
+    // Add current bowler to saved list if not already there
+    if (setupBowler && !savedBowlers.includes(setupBowler)) {
+      setSavedBowlers([...savedBowlers, setupBowler]);
+    }
+    
+    setPage("match");
+  };
+
+  const openStartSecondModal = (firstSnapshot) => {
+    // save the first innings snapshot detail for final summary
+    setFirstInningsDetail(firstSnapshot);
+
+    // clear previous innings' bowler list so 1st innings bowlers don't show
+    setBowlerStats({});
+    setCurrentBowler("");
+    setSecondStriker("");
+    setSecondNonStriker("");
+    setSecondBowler("");
+    setStartSecondOpen(true);
+  };
+
+  const startSecondInnings = () => {
+    if (!secondStriker || !secondNonStriker || !secondBowler) {
+      alert("Enter striker, non-striker, and bowler for second innings.");
+      return;
+    }
+
+    // set batting team to other team
+    const other = battingTeam === team1 ? team2 : team1;
+
+    // reset relevant match state to start chase
+    const b = {};
+    b[secondStriker] = { name: secondStriker, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
+    b[secondNonStriker] = { name: secondNonStriker, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
+    setBatsmen(b);
+
+    // Important: initialize bowler stats only with second innings bowler(s)
+    const secondBowObj = {};
+    secondBowObj[secondBowler] = { balls: 0, runs: 0, wickets: 0 };
+    setBowlerStats(secondBowObj);
+
+    setStriker(secondStriker);
+    setNonStriker(secondNonStriker);
+    setCurrentBowler(secondBowler);
+
+    setTotalRuns(0);
+    setTotalWickets(0);
+    setBalls(0);
+    setHistory([]);
+    setExtras(0);
+    setPendingNegative(null);
+
+    setBattingTeam(other);
+    setInnings(2);
+    setStartSecondOpen(false);
+    
+    // Reset partnership
+    setCurrentPartnership({
+      batsman1: secondStriker,
+      batsman2: secondNonStriker,
+      runs: 0,
+      balls: 0,
+      startOver: 0,
+      startBall: 0
+    });
+    
+    // Reset chart
+    setRunRateData({
+      labels: [0],
+      datasets: [
+        {
+          label: 'Run Rate',
+          data: [0],
+          fill: false,
+          backgroundColor: '#4a7c28',
+          borderColor: '#4a7c28',
+        }
+      ]
+    });
+    
+    // Add current bowler to saved list if not already there
+    if (secondBowler && !savedBowlers.includes(secondBowler)) {
+      setSavedBowlers([...savedBowlers, secondBowler]);
+    }
+  };
+
+  const openFinalSummary = (secondSnapshot, resultText) => {
+    setSecondInningsDetail({ ...secondSnapshot, resultText, firstInningsDetail });
+    setFinalModalOpen(true);
+  };
+
+  const downloadFinalPDFAndExit = () => {
+    const element = document.getElementById("final-scorecard");
+    if (!element) {
+      alert("Final scorecard element not found. Make sure the final modal is open.");
+      return;
+    }
+
+    html2canvas(element)
+      .then((canvas) => {
+        const imgData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF("p", "mm", "a4");
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+
+        // sanitize team names for filename
+        const safe = (s) =>
+          (s || "")
+            .toString()
+            .trim()
+            .replace(/\s+/g, "_")
+            .replace(/[^a-zA-Z0-9_-]/g, "") || "Team";
+
+        const fileName = `${safe(team1)}_vs_${safe(team2)}_FinalScorecard.pdf`;
+        try {
+          pdf.save(fileName);
+        } catch (err) {
+          pdf.save("final-scorecard.pdf");
+        }
+
+        // close modal and return to setup/home
+        setFinalModalOpen(false);
+        setPage("setup");
+      })
+      .catch((err) => {
+        console.error("PDF generation failed:", err);
+        alert("Failed to generate PDF. See console for details.");
+      });
+  };
+
+  const renderInningsHtml = (snap) => {
+    if (!snap) return "<div>No data</div>";
+    const bats = snap.batsmen || {};
+    const bowlers = snap.bowlerStats || {};
+    const batsRows = Object.values(bats).map((b) => {
+      const sr = b.balls > 0 ? ((b.runs / b.balls) * 100).toFixed(1) : "-";
+      return `<tr><td>${escapeHtml(b.name)}</td><td>${b.runs}</td><td>${b.balls}</td><td>${b.fours}</td><td>${b.sixes}</td><td>${sr}</td><td>${escapeHtml(b.status)}</td></tr>`;
+    }).join("");
+    const bowlRows = Object.entries(bowlers).map(([name, s]) => {
+      const econ = s.balls > 0 ? (s.runs / (s.balls / 6)).toFixed(2) : "-";
+      return `<tr><td>${escapeHtml(name)}</td><td>${formatOvers(s.balls)}</td><td>${s.runs}</td><td>${s.wickets}</td><td>${econ}</td></tr>`;
+    }).join("");
+    return `
+      <table>
+        <thead><tr><th>Batsman</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th><th>Status</th></tr></thead>
+        <tbody>${batsRows}</tbody>
+      </table>
+      <div>Extras: ${snap.extras || 0}</div>
+      <table>
+        <thead><tr><th>Bowler</th><th>O</th><th>R</th><th>W</th><th>Econ</th></tr></thead>
+        <tbody>${bowlRows}</tbody>
+      </table>
+    `;
+  };
+
+  const escapeHtml = (str) => {
+    if (!str && str !== 0) return "";
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  };
+
+  const recordDelivery = ({ type, runs = 0, wicketDetails = null, extrasDelta = 0, skipNegativePrompt = false }) => {
+    pushSnapshot();let r = 0;
+
+
+    let newTotalRuns = totalRuns;
+    let newTotalWickets = totalWickets;
+    let newBalls = balls;
+    const batsCopy = clone(batsmen);
+    const bowlCopy = clone(bowlerStats);
+    let newStriker = striker;
+    let newNon = nonStriker;
+
+    const startStriker = newStriker;
+    const startNon = newNon;
+
+    if (currentBowler) ensureBowler(currentBowler, bowlCopy);
+
+    const isWideOrNoBall = type === "wide" || type === "noball";
+    const countsAsLegal = !isWideOrNoBall;
+
+    const swapLocalStrikes = () => {
+      const tmp = newStriker;
+      newStriker = newNon;
+      newNon = tmp;
+    };
+
+    // APPLY extrasDelta WITHOUT counting the ball (so wicket logic will handle the ball increment)
+    if (extrasDelta && typeof extrasDelta === "number" && extrasDelta !== 0) {
+      newTotalRuns += extrasDelta;
+      setExtras((prev) => prev + extrasDelta);
+      if (currentBowler) {
+        bowlCopy[currentBowler].runs += extrasDelta;
+        // DO NOT increment bowlCopy[currentBowler].balls here — wicket logic counts the ball.
+      }
+      // DO NOT increment batsman balls or newBalls here for extrasDelta — wicket will count the ball.
+    }
+
+    if (type === "run" || type === "manual") {
+      // Fixed: Define 'r' properly before using it
+      const r = Number(runs) || 0;
+
+      // handle negative manual runs: show in-app Yes/No modal (unless skipNegativePrompt)
+      if (type === "manual" && r < 0 && !skipNegativePrompt) {
+        // store pending negative and wait for user to answer
+        setPendingNegative(r);
+        return;
+      }
+
+      // If skipNegativePrompt is true and r < 0, we apply negative runs directly (non-out path)
+      if (type === "manual" && r < 0 && skipNegativePrompt) {
+        newTotalRuns += r;
+        setExtras((prev) => prev + r);
+        if (currentBowler) {
+          bowlCopy[currentBowler].runs += r;
+          bowlCopy[currentBowler].balls += 1; // count the ball here for non-out negative
+        }
+        ensureBatsman(newStriker, batsCopy);
+        batsCopy[newStriker].balls += 1;
+        newBalls += 1;
+        // don't change batsman runs
+        setTotalRuns(newTotalRuns);
+        setTotalWickets(newTotalWickets);
+        setBalls(newBalls);
+        setBatsmen(batsCopy);
+        setBowlerStats(bowlCopy);
+        setStriker(newStriker);
+        setNonStriker(newNon);
+        // clear pending if any
+        setPendingNegative(null);
+
+        // After applying, check innings/target conditions (if innings 2)
+        if (innings === 2 && target !== null) {
+          // if reached or exceeded target -> batting team wins
+          if (newTotalRuns >= target) {
+            // build second snapshot and open final summary
+            const secondSnapshot = {
+              battingTeam,
+              totalRuns: newTotalRuns,
+              totalWickets: newTotalWickets,
+              balls: newBalls,
+              batsmen: clone(batsCopy),
+              bowlerStats: clone(bowlCopy),
+              extras: extras + (extrasDelta ? extrasDelta : 0),
+            };
+            openFinalSummary(secondSnapshot, `${battingTeam} wins! (${newTotalRuns} / ${newTotalWickets})`);
+            return;
+          }
+          // if overs finished -> determine winner or tie
+          if (oversLimitNum && newBalls >= oversLimitNum * 6) {
+            const F = firstInningsScore || 0;
+            let resultText;
+            if (newTotalRuns === F) {
+              resultText = "MATCH TIED";
+            } else {
+              const winner = newTotalRuns > F ? battingTeam : (battingTeam === team1 ? team2 : team1);
+              resultText = `${winner} wins!`;
+            }
+            const secondSnapshot = {
+              battingTeam,
+              totalRuns: newTotalRuns,
+              totalWickets: newTotalWickets,
+              balls: newBalls,
+              batsmen: clone(batsCopy),
+              bowlerStats: clone(bowlCopy),
+              extras: extras,
+            };
+            openFinalSummary(secondSnapshot, resultText);
+            return;
+          }
+        }
+
+        return;
+      }
+
+      // normal positive/manual >= 0 runs
+      newTotalRuns += r;
+      ensureBatsman(newStriker, batsCopy);
+
+      // count ball for normal deliveries and for manual positive
+      if (type !== "manual") {
+        batsCopy[newStriker].balls += 1;
+        if (currentBowler) bowlCopy[currentBowler].balls += 1;
+        newBalls += 1;
+      } else if (type === "manual" && r >= 0) {
+        batsCopy[newStriker].balls += 1;
+        if (currentBowler) bowlCopy[currentBowler].balls += 1;
+        newBalls += 1;
+      }
+
+      if (r > 0) {
+        batsCopy[newStriker].runs += r;
+        if (r === 4) batsCopy[newStriker].fours += 1;
+        if (r === 6) batsCopy[newStriker].sixes += 1;
+      }
+
+      if (currentBowler && type !== "manual") {
+        bowlCopy[currentBowler].runs += r;
+      } else if (currentBowler && type === "manual" && r >= 0) {
+        bowlCopy[currentBowler].runs += r;
+      }
+
+      if (type !== "manual" && r % 2 === 1) swapLocalStrikes();
+    }
+
+    else if (type === "wicket") {
+      const wd = wicketDetails || {};
+      const runOutInfo = wd.runOut || null;
+
+      // If runOut had runsBefore, apply them (this counts as part of wicket ball)
+      if (runOutInfo && Number(runOutInfo.runsBefore)) {
+        const runsBefore = Number(runOutInfo.runsBefore);
+        ensureBatsman(newStriker, batsCopy);
+        batsCopy[newStriker].runs += runsBefore;
+        batsCopy[newStriker].balls += 1;
+        newTotalRuns += runsBefore;
+        if (currentBowler) {
+          bowlCopy[currentBowler].runs += runsBefore;
+          bowlCopy[currentBowler].balls += 1;
+        }
+        newBalls += 1;
+        if (runsBefore % 2 === 1) swapLocalStrikes();
+      } else {
+        // count the legal ball for the wicket (only here)
+        newBalls += 1;
+        if (currentBowler) bowlCopy[currentBowler].balls += 1;
+      }
+
+      if (runOutInfo) {
+        const end = runOutInfo.end || "Striker End";
+        const whoOutNorm = (runOutInfo.whoOut || "").toLowerCase();
+        let outBatterName =
+          whoOutNorm === "striker"
+            ? startStriker
+            : whoOutNorm === "non-striker"
+            ? startNon
+            : end === "Striker End"
+            ? newStriker
+            : newNon;
+
+        ensureBatsman(outBatterName, batsCopy);
+        batsCopy[outBatterName].status = `out (Run Out)`;
+
+        const replacement = wd.newBatsman?.trim() || null;
+        const survivor = outBatterName === startStriker ? startNon : startStriker;
+
+        const isLastBall = countsAsLegal && newBalls > 0 && newBalls % 6 === 0;
+
+        if (isLastBall) {
+          if (end === "Striker End") {
+            newStriker = survivor;
+            newNon = replacement || "-----";
+          } else {
+            newStriker = replacement || "-----";
+            newNon = survivor;
+          }
+        } else {
+          if (end === "Striker End") {
+            newStriker = replacement || "-----";
+            newNon = survivor;
+          } else {
+            newNon = replacement || "-----";
+            newStriker = survivor;
+          }
+        }
+
+        if (replacement) {
+          batsCopy[replacement] = { name: replacement, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
+        }
+
+        newTotalWickets += 1;
+      } else {
+        const method = wd.method || "Out";
+        let outName = wd.outName?.trim() || newStriker;
+        ensureBatsman(outName, batsCopy);
+        batsCopy[outName].status = `out (${method})`;
+        if (currentBowler && method !== "Run Out") bowlCopy[currentBowler].wickets += 1;
+        const replacement = wd.newBatsman?.trim();
+        if (replacement) {
+          batsCopy[replacement] = { name: replacement, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
+          if (outName === newStriker) newStriker = replacement;
+          else if (outName === newNon) newNon = replacement;
+          else newStriker = replacement;
+        } else {
+          if (outName === newStriker) newStriker = "-----";
+          else if (outName === newNon) newNon = "-----";
+        }
+        newTotalWickets += 1;
+      }
+    }
+
+    else if (type === "wide" || type === "noball") {
+      // Fixed: Define 'r' properly before using it
+      const r = Number(runs) || 1;
+      newTotalRuns += r;
+      if (currentBowler) bowlCopy[currentBowler].runs += r;
+      if (r > 0 && r % 2 === 0) swapLocalStrikes();
+    }
+
+    else if (type === "bye" || type === "legbye") {
+      // Fixed: Define 'r' properly before using it
+      const r = Number(runs) || 1;
+      newTotalRuns += r;
+      if (currentBowler) {
+        bowlCopy[currentBowler].runs += r;
+        bowlCopy[currentBowler].balls += 1;
+      }
+      ensureBatsman(newStriker, batsCopy);
+      batsCopy[newStriker].balls += 1;
+      newBalls += 1;
+      if (r % 2 === 1) swapLocalStrikes();
+    }
+
+    // apply the computed state (this ensures runs from this delivery are in place before match-end logic)
+    setTotalRuns(newTotalRuns);
+    setTotalWickets(newTotalWickets);
+    setBalls(newBalls);
+    setBatsmen(batsCopy);
+    setBowlerStats(bowlCopy);
+    setStriker(newStriker);
+    setNonStriker(newNon);
+
+    // Update run rates
+    const newRunRate = calculateRunRate(newTotalRuns, newBalls);
+    setCurrentRunRate(newRunRate);
+    
+    if (innings === 2) {
+      const newRequiredRunRate = calculateRequiredRunRate();
+      setRequiredRunRate(newRequiredRunRate);
+    }
+    
+    // Update partnership
+    if (currentPartnership.batsman1 === newStriker || currentPartnership.batsman2 === newStriker) {
+      setCurrentPartnership(prev => ({
+        ...prev,
+        runs: prev.runs + r,
+        balls: prev.balls + 1
+      }));
+    }
+    
+    // Update chart
+    updateRunRateChart();
+    
+    // Check for milestones
+    checkMilestone(newTotalRuns, newTotalWickets);
+
+    // clear any pending negative if it was applied here
+    if ((extrasDelta && extrasDelta !== 0) || (type === "manual" && skipNegativePrompt && Number(runs) < 0)) {
+      setPendingNegative(null);
+    }
+
+    // If innings 1 finished due to overs limit -> start second innings flow
+    if (innings === 1 && oversLimitNum && newBalls >= oversLimitNum * 6) {
+      // capture first innings snapshot BEFORE clearing bowler/batsman for second innings
+      const firstSnapshot = {
+        battingTeam,
+        totalRuns: newTotalRuns,
+        totalWickets: newTotalWickets,
+        balls: newBalls,
+        batsmen: clone(batsCopy),
+        bowlerStats: clone(bowlCopy),
+        extras,
+      };
+      setFirstInningsScore(newTotalRuns);
+      setTarget(newTotalRuns + 1);
+
+      // open second innings modal and clear live bowler list inside it
+      openStartSecondModal(firstSnapshot);
+      return; // stop other prompts
+    }
+
+    // During innings 2 check for target reached or overs finished
+    if (innings === 2) {
+      // First, if target reached or exceeded -> batting team wins
+      if (target !== null && newTotalRuns >= target) {
+        const secondSnapshot = {
+          battingTeam,
+          totalRuns: newTotalRuns,
+          totalWickets: newTotalWickets,
+          balls: newBalls,
+          batsmen: clone(batsCopy),
+          bowlerStats: clone(bowlCopy),
+          extras,
+        };
+        openFinalSummary(secondSnapshot, `${battingTeam} wins! (${newTotalRuns} / ${newTotalWickets})`);
+        return;
+      }
+
+      // If overs finished (or last ball) -> decide winner or tie
+      if (oversLimitNum && newBalls >= oversLimitNum * 6) {
+        const F = firstInningsScore !== null ? firstInningsScore : 0;
+        let resultText;
+        if (newTotalRuns === F) {
+          resultText = "MATCH TIED";
+        } else {
+          // if chase exceeded F it would have been caught by target check above.
+          const winner = newTotalRuns > F ? battingTeam : (battingTeam === team1 ? team2 : team1);
+          resultText = `${winner} wins!`;
+        }
+        const secondSnapshot = {
+          battingTeam,
+          totalRuns: newTotalRuns,
+          totalWickets: newTotalWickets,
+          balls: newBalls,
+          batsmen: clone(batsCopy),
+          bowlerStats: clone(bowlCopy),
+          extras,
+        };
+        openFinalSummary(secondSnapshot, resultText);
+        return;
+      }
+    }
+
+    // normal over-complete next bowler prompt (only if innings still running and not just handed to second innings)
+    if (countsAsLegal && newBalls > 0 && newBalls % 6 === 0) {
+      if (!(innings === 1 && oversLimitNum && newBalls >= oversLimitNum * 6)) {
+        // Open bowler selection modal instead of prompt
+        setBowlerSelectionOpen(true);
+      }
+    }
+  };
+
+  const undo = () => {
+    if (history.length === 0) {
+      alert("Nothing to undo");
+      return;
+    }
+    const last = history[history.length - 1];
+    setHistory((h) => h.slice(0, -1));
+    restoreSnapshot(last);
+    
+    // Recalculate run rates and partnership
+    const newRunRate = calculateRunRate(totalRuns, balls);
+    setCurrentRunRate(newRunRate);
+    
+    if (innings === 2) {
+      const newRequiredRunRate = calculateRequiredRunRate();
+      setRequiredRunRate(newRequiredRunRate);
+    }
+    
+    updatePartnership();
+    updateRunRateChart();
+  };
+
+  const swapBats = () => {
+    pushSnapshot();
+    const s = striker;
+    const n = nonStriker;
+    setStriker(n);
+    setNonStriker(s);
+    updatePartnership();
+  };
+
+  const retire = (which) => {
+    pushSnapshot();
+    if (which === "S") {
+      setBatsmen((prev) => {
+        const copy = clone(prev);
+        if (copy[striker]) copy[striker].status = "retired";
+        return copy;
+      });
+      const newName = window.prompt("Enter replacement striker name:", "");
+      if (newName) {
+        setBatsmen((prev) => ({ ...prev, [newName]: { name: newName, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" } }));
+        setStriker(newName);
+      }
+    } else {
+      setBatsmen((prev) => {
+        const copy = clone(prev);
+        if (copy[nonStriker]) copy[nonStriker].status = "retired";
+        return copy;
+      });
+      const newName = window.prompt("Enter replacement non-striker name:", "");
+      if (newName) {
+        setBatsmen((prev) => ({ ...prev, [newName]: { name: newName, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" } }));
+        setNonStriker(newName);
+      }
+    }
+    updatePartnership();
+  };
+
+  const changeBowler = () => {
+    pushSnapshot();
+    setBowlerSelectionOpen(true);
+  };
+
+  const openWicketPanel = () => {
+    setWicketForm((prev) => ({
+      ...prev,
+      outName: striker || "",
+      method: "Bowled",
+      helper: "",
+      newBatsman: "",
+      isRunOut: false,
+      runOutWhichBatter: "Striker",
+      runOutEnd: "Striker End",
+      runsBefore: 0,
+    }));
+    setWicketPanelOpen(true);
+  };
+
+  const submitWicketPanel = () => {
+    const wf = { ...wicketForm };
+
+    // require new batsman name
+    if (!wf.newBatsman || wf.newBatsman.trim() === "") {
+      alert("New batsman name is required. Please enter a name.");
+      return;
+    }
+
+    const wicketDetails = {
+      method: wf.method,
+      helper: wf.helper,
+      newBatsman: wf.newBatsman,
+      outName: wf.outName,
+    };
+    if (wf.isRunOut) {
+      wicketDetails.runOut = {
+        whoOut: wf.runOutWhichBatter,
+        end: wf.runOutEnd,
+        runsBefore: Number(wf.runsBefore) || 0,
+      };
+    }
+
+    setWicketPanelOpen(false);
+
+    // If there is a pending negative, apply it together with the wicket (extrasDelta)
+    if (pendingNegative && Number(pendingNegative) !== 0) {
+      recordDelivery({ type: "wicket", wicketDetails, extrasDelta: pendingNegative });
+      setPendingNegative(null);
+    } else {
+      recordDelivery({ type: "wicket", wicketDetails });
+    }
+  };
+
+  const handleNegativeConfirm = (isOut) => {
+    if (!pendingNegative) return;
+    const r = pendingNegative;
+    if (isOut) {
+      // open wicket panel; pendingNegative will be applied on wicket submit
+      openWicketPanel();
+    } else {
+      // apply negative as extras (non-out path). Use skipNegativePrompt to avoid re-prompt.
+      recordDelivery({ type: "manual", runs: r, skipNegativePrompt: true });
+    }
+  };
+
+  const getOrderedBatsmen = () => {
+    const used = new Set();
+    const result = [];
+
+    if (striker && batsmen[striker]) {
+      result.push(batsmen[striker]);
+      used.add(striker);
+    }
+
+    if (nonStriker && nonStriker !== striker && batsmen[nonStriker]) {
+      result.push(batsmen[nonStriker]);
+      used.add(nonStriker);
+    }
+
+    // other currently batting
+    Object.values(batsmen).forEach((b) => {
+      if (!used.has(b.name) && b.status === "batting") {
+        result.push(b);
+        used.add(b.name);
+      }
+    });
+
+    // out / retired players after
+    Object.values(batsmen).forEach((b) => {
+      if (!used.has(b.name)) {
+        result.push(b);
+        used.add(b.name);
+      }
+    });
+
+    return result;
+  };
+
+  // UI: login
+  if (page === "login") {
+    return (
+      <AppContainer darkMode={darkMode}>
+        <Header>
+          <Logo>
+            🏏 Cricket Scoring App
+          </Logo>
+          <DarkModeToggle onClick={toggleDarkMode}>
+            {darkMode ? '☀️' : '🌙'}
+          </DarkModeToggle>
+        </Header>
+        <MainContent>
+          <Card style={{ maxWidth: '500px', margin: '0 auto' }} darkMode={darkMode}>
+            <CardTitle darkMode={darkMode}>Login</CardTitle>
+            <FormColumn>
+              <Input 
+                type="tel" 
+                placeholder="Phone (dummy)" 
+                value={phone} 
+                onChange={(e) => setPhone(e.target.value)}
+                darkMode={darkMode}
+              />
+              <Button primary onClick={() => setPage("setup")}>Login (dummy)</Button>
+            </FormColumn>
+          </Card>
+        </MainContent>
+      </AppContainer>
+    );
+  }
+
+  // UI: setup
+  if (page === "setup") {
+    return (
+      <AppContainer darkMode={darkMode}>
+        <Header>
+          <Logo>
+            🏏 Cricket Scoring App
+          </Logo>
+          <DarkModeToggle onClick={toggleDarkMode}>
+            {darkMode ? '☀️' : '🌙'}
+          </DarkModeToggle>
+        </Header>
+        <MainContent>
+          <Card darkMode={darkMode}>
+            <CardTitle darkMode={darkMode}>Match Setup</CardTitle>
+            
+            {/* Team 1 Setup */}
+            <FormRow>
+              <FormColumn>
+                <TeamSetupContainer>
+                  <TeamLogoContainer>
+                    {team1Logo ? (
+                      <TeamLogoPreview src={team1Logo} alt="Team 1 Logo" />
+                    ) : (
+                      <span>🏏</span>
+                    )}
+                  </TeamLogoContainer>
+                  <TeamDetails>
+                    <Input 
+                      placeholder="Team 1" 
+                      value={team1} 
+                      onChange={(e) => setTeam1(e.target.value)}
+                      darkMode={darkMode}
+                    />
+                    <FileUpload>
+                      <FileUploadInput
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleTeamLogoUpload(1, e)}
+                      />
+                      <FileUploadLabel darkMode={darkMode}>
+                        📷 Upload Logo
+                      </FileUploadLabel>
+                    </FileUpload>
+                    <Button onClick={() => openSquadModal(1)}>
+                      👥 Manage Squad
+                    </Button>
+                  </TeamDetails>
+                </TeamSetupContainer>
+              </FormColumn>
+              
+              <FormColumn style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <strong>VS</strong>
+              </FormColumn>
+              
+              {/* Team 2 Setup */}
+              <FormColumn>
+                <TeamSetupContainer>
+                  <TeamLogoContainer>
+                    {team2Logo ? (
+                      <TeamLogoPreview src={team2Logo} alt="Team 2 Logo" />
+                    ) : (
+                      <span>🏏</span>
+                    )}
+                  </TeamLogoContainer>
+                  <TeamDetails>
+                    <Input 
+                      placeholder="Team 2" 
+                      value={team2} 
+                      onChange={(e) => setTeam2(e.target.value)}
+                      darkMode={darkMode}
+                    />
+                    <FileUpload>
+                      <FileUploadInput
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleTeamLogoUpload(2, e)}
+                      />
+                      <FileUploadLabel darkMode={darkMode}>
+                        📷 Upload Logo
+                      </FileUploadLabel>
+                    </FileUpload>
+                    <Button onClick={() => openSquadModal(2)}>
+                      👥 Manage Squad
+                    </Button>
+                  </TeamDetails>
+                </TeamSetupContainer>
+              </FormColumn>
+            </FormRow>
+            
+            <FormRow>
+              <FormColumn>
+                <label>Toss Winner:</label>
+                <Select value={tossWinner} onChange={(e) => setTossWinner(e.target.value)} darkMode={darkMode}>
+                  <option value="">Select</option>
+                  <option value={team1}>{team1 || "Team 1"}</option>
+                  <option value={team2}>{team2 || "Team 2"}</option>
+                </Select>
+              </FormColumn>
+              <FormColumn>
+                <label>Decision:</label>
+                <Select value={decision} onChange={(e) => setDecision(e.target.value)} darkMode={darkMode}>
+                  <option value="">Select</option>
+                  <option value="Batting">Batting</option>
+                  <option value="Bowling">Bowling</option>
+                </Select>
+              </FormColumn>
+            </FormRow>
+            
+            <FormRow>
+              <FormColumn>
+                <Input 
+                  type="number" 
+                  placeholder="Overs (e.g., 20)" 
+                  value={oversLimit} 
+                  onChange={(e) => setOversLimit(e.target.value)}
+                  darkMode={darkMode}
+                />
+              </FormColumn>
+              <FormColumn>
+                <Input 
+                  placeholder="Ground" 
+                  value={ground} 
+                  onChange={(e) => setGround(e.target.value)}
+                  darkMode={darkMode}
+                />
+              </FormColumn>
+              <FormColumn>
+                <Input 
+                  type="date" 
+                  value={date} 
+                  onChange={(e) => setDate(e.target.value)}
+                  darkMode={darkMode}
+                />
+              </FormColumn>
+            </FormRow>
+            
+            <CardTitle style={{ fontSize: '1.2rem', marginTop: '1.5rem' }} darkMode={darkMode}>Initial Players</CardTitle>
+            <FormRow>
+              <FormColumn>
+                <label>Striker batsman:</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <Input 
+                    placeholder="Striker batsman" 
+                    value={setupStriker} 
+                    onChange={(e) => setSetupStriker(e.target.value)}
+                    darkMode={darkMode}
+                  />
+                  <Button onClick={() => setSquadModalOpen(true)}>
+                    👥
+                  </Button>
+                </div>
+              </FormColumn>
+              <FormColumn>
+                <label>Non-striker batsman:</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <Input 
+                    placeholder="Non-striker batsman" 
+                    value={setupNonStriker} 
+                    onChange={(e) => setSetupNonStriker(e.target.value)}
+                    darkMode={darkMode}
+                  />
+                  <Button onClick={() => setSquadModalOpen(true)}>
+                    👥
+                  </Button>
+                </div>
+              </FormColumn>
+              <FormColumn>
+                <label>Bowler:</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <Input 
+                    placeholder="Bowler" 
+                    value={setupBowler} 
+                    onChange={(e) => setSetupBowler(e.target.value)}
+                    darkMode={darkMode}
+                  />
+                  <Button onClick={() => setBowlerSelectionOpen(true)}>
+                    🎯
+                  </Button>
+                </div>
+              </FormColumn>
+            </FormRow>
+            
+            {/* Initial Players Display */}
+            {(setupStriker || setupNonStriker || setupBowler) && (
+              <InitialPlayersDisplay darkMode={darkMode}>
+                <PlayerRole>
+                  <div className="role-label">STRIKER</div>
+                  <div className="player-name">{setupStriker || "Not set"}</div>
+                </PlayerRole>
+                <PlayerRole>
+                  <div className="role-label">NON-STRIKER</div>
+                  <div className="player-name">{setupNonStriker || "Not set"}</div>
+                </PlayerRole>
+                <PlayerRole>
+                  <div className="role-label">BOWLER</div>
+                  <div className="player-name">{setupBowler || "Not set"}</div>
+                </PlayerRole>
+              </InitialPlayersDisplay>
+            )}
+            
+            <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+              <Button primary onClick={startMatch}>Start Match</Button>
+            </div>
+          </Card>
+        </MainContent>
+        
+        {/* Squad Modal */}
+        {squadModalOpen && (
+          <Modal>
+            <ModalContent darkMode={darkMode}>
+              <ModalHeader>
+                <ModalTitle darkMode={darkMode}>
+                  {currentSquadTeam === 1 ? team1 : team2} Squad
+                </ModalTitle>
+                <CloseButton onClick={() => setSquadModalOpen(false)}>×</CloseButton>
+              </ModalHeader>
+              
+              <FormRow>
+                <FormColumn>
+                  <Input 
+                    placeholder="Player name" 
+                    value={newPlayerName} 
+                    onChange={(e) => setNewPlayerName(e.target.value)}
+                    darkMode={darkMode}
+                  />
+                </FormColumn>
+                <FormColumn>
+                  <Button onClick={addPlayerToSquad}>Add Player</Button>
+                </FormColumn>
+              </FormRow>
+              
+              <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                {(currentSquadTeam === 1 ? team1Squad : team2Squad).map((player, index) => (
+                  <div key={index} style={{ 
+                    padding: '0.5rem', 
+                    borderBottom: `1px solid ${darkMode ? '#444' : '#eee'}`,
+                    display: 'flex',
+                    justifyContent: 'space-between'
+                  }}>
+                    <span>{player}</span>
+                    <div>
+                      <Button onClick={() => selectPlayerFromSquad(player, 'striker')}>🏏</Button>
+                      <Button onClick={() => selectPlayerFromSquad(player, 'nonStriker')}>🏏</Button>
+                      <Button onClick={() => selectPlayerFromSquad(player, 'bowler')}>🎯</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ModalContent>
+          </Modal>
+        )}
+        
+        {/* Bowler Selection Modal */}
+        {bowlerSelectionOpen && (
+          <Modal>
+            <BowlerSelectionModal darkMode={darkMode}>
+              <BowlerSelectionHeader>
+                <h3>Select Bowler</h3>
+              </BowlerSelectionHeader>
+              
+              <FormRow>
+                <FormColumn>
+                  <Input 
+                    placeholder="New bowler name" 
+                    value={newBowlerName} 
+                    onChange={(e) => setNewBowlerName(e.target.value)}
+                    darkMode={darkMode}
+                  />
+                </FormColumn>
+                <FormColumn>
+                  <Button onClick={addBowler}>Add Bowler</Button>
+                </FormColumn>
+              </FormRow>
+              
+              <BowlerList>
+                {savedBowlers.map((bowler, index) => (
+                  <BowlerOption 
+                    key={index} 
+                    onClick={() => selectBowler(bowler)}
+                    selected={currentBowler === bowler}
+                    darkMode={darkMode}
+                  >
+                    {bowler}
+                  </BowlerOption>
+                ))}
+              </BowlerList>
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                <Button onClick={() => setBowlerSelectionOpen(false)}>Cancel</Button>
+              </div>
+            </BowlerSelectionModal>
+          </Modal>
+        )}
+      </AppContainer>
+    );
+  }
+
+  // UI: match
+  return (
+    <AppContainer darkMode={darkMode}>
+      <Header>
+        <TeamNameWithLogo>
+          {team1Logo && <TeamLogo src={team1Logo} alt={team1} />}
+          <Logo>
+            {team1} vs {team2}
+          </Logo>
+          {team2Logo && <TeamLogo src={team2Logo} alt={team2} />}
+        </TeamNameWithLogo>
+        <DarkModeToggle onClick={toggleDarkMode}>
+          {darkMode ? '☀️' : '🌙'}
+        </DarkModeToggle>
+      </Header>
+      <MainContent>
+        <Card darkMode={darkMode}>
+          <TeamInfo>
+            <h2>{team1} vs {team2}</h2>
+            <div>
+              <Button onClick={() => { if (window.confirm("End match and return to setup? (state kept until reload)")) setPage("setup"); }}>
+                End Match
+              </Button>
+            </div>
+          </TeamInfo>
+          <MatchInfo>
+            <InfoItem>📍 {ground}</InfoItem>
+            <InfoItem>📅 {date}</InfoItem>
+            <InfoItem>🎯 Toss: {tossWinner} chose {decision}</InfoItem>
+            <InfoItem>🏏 Innings: {innings}</InfoItem>
+            <InfoItem>👥 Batting: {battingTeam}</InfoItem>
+            {innings === 2 && target && <InfoItem>🎯 Target: {target}</InfoItem>}
+          </MatchInfo>
+        </Card>
+
+        <ScoreDisplay>
+          <div>Score</div>
+          <ScoreMain highlight={highlightMilestone}>{totalRuns}/{totalWickets}</ScoreMain>
+          <ScoreDetails>{formatOvers(balls)} overs {oversLimitNum ? `of ${oversLimitNum}` : ""}</ScoreDetails>
+          <ScoreDetails>Extras: {extras}</ScoreDetails>
+          
+          <RunRateDisplay>
+            <RunRateItem>
+              <RunRateLabel>CRR</RunRateLabel>
+              <RunRateValue>{currentRunRate}</RunRateValue>
+            </RunRateItem>
+            {innings === 2 && target && (
+              <RunRateItem>
+                <RunRateLabel>RRR</RunRateLabel>
+                <RunRateValue>{requiredRunRate}</RunRateValue>
+              </RunRateItem>
+            )}
+          </RunRateDisplay>
+        </ScoreDisplay>
+
+        {/* Partnership Display */}
+        {currentPartnership.runs > 0 && (
+          <PartnershipDisplay darkMode={darkMode}>
+            <PartnershipTitle darkMode={darkMode}>
+              Current Partnership: {currentPartnership.batsman1} & {currentPartnership.batsman2}
+            </PartnershipTitle>
+            <PartnershipDetails>
+              <span>Runs: {currentPartnership.runs}</span>
+              <span>Balls: {currentPartnership.balls}</span>
+            </PartnershipDetails>
+          </PartnershipDisplay>
+        )}
+
+        {/* Run Rate Chart */}
+        <Card darkMode={darkMode}>
+          <CardTitle darkMode={darkMode}>Run Rate Progression</CardTitle>
+          <ChartContainer>
+            <Line data={runRateData} options={chartOptions} />
+          </ChartContainer>
+        </Card>
+
+        <MobileScorecard>
+          <MobileCard darkMode={darkMode}>
+            <CardTitle darkMode={darkMode}>Batting</CardTitle>
+            <TableContainer>
+              <Table darkMode={darkMode}>
+                <thead>
+                  <tr>
+                    <th>Batsman</th>
+                    <th>R</th>
+                    <th>B</th>
+                    <th>4s</th>
+                    <th>6s</th>
+                    <th>SR</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getOrderedBatsmen().map((b) => {
+                    const sr = b.balls > 0 ? ((b.runs / b.balls) * 100).toFixed(1) : "-";
+                    const isCurrentPlayer = b.name === striker || b.name === nonStriker;
+                    return (
+                      <tr key={b.name} className={isCurrentPlayer ? 'current-player' : ''}>
+                        <td>{b.name}</td>
+                        <td>{b.runs}</td>
+                        <td>{b.balls}</td>
+                        <td>{b.fours}</td>
+                        <td>{b.sixes}</td>
+                        <td>{sr}</td>
+                        <td><StatusBadge status={b.status}>{b.status}</StatusBadge></td>
+                      </tr>
+                    );
+                  })}
+                  <tr>
+                    <td><strong>Extras</strong></td>
+                    <td>{extras}</td>
+                    <td colSpan="5"></td>
+                  </tr>
+                </tbody>
+              </Table>
+            </TableContainer>
+            
+            <div style={{ marginBottom: '1rem' }}>
+              <strong>Current Bowler:</strong> {currentBowler}
+            </div>
+            
+            <CardTitle style={{ fontSize: '1.1rem' }} darkMode={darkMode}>Scoring Actions</CardTitle>
+            <ActionButtons>
+              <RunButton run={0} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 0 })} animate={animateBall}>
+                🏏 0
+              </RunButton>
+              <RunButton run={1} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 1 })} animate={animateBall}>
+                🏏 1
+              </RunButton>
+              <RunButton run={2} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 2 })} animate={animateBall}>
+                🏏 2
+              </RunButton>
+              <RunButton run={3} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 3 })} animate={animateBall}>
+                🏏 3
+              </RunButton>
+              <RunButton run={4} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 4 })} animate={animateBall}>
+                🏏 4
+              </RunButton>
+              <RunButton run={6} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 6 })} animate={animateBall}>
+                🏏 6
+              </RunButton>
+              <Button onClick={() => setManualRunsOpen(true)}>
+                📝 Manual
+              </Button>
+            </ActionButtons>
+            
+            <CardTitle style={{ fontSize: '1.1rem' }} darkMode={darkMode}>Wicket & Extras</CardTitle>
+            <ActionButtons>
+              <WicketButton onClick={openWicketPanel}>
+                🎯 Wicket
+              </WicketButton>
+              <ExtrasButton onClick={() => { 
+                const r = parseInt(window.prompt("Wide runs (default 1):", "1") || "1", 10) || 1; 
+                recordDeliveryWithAnimation({ type: "wide", runs: r }); 
+              }}>
+                📏 Wide
+              </ExtrasButton>
+              <ExtrasButton onClick={() => { 
+                const r = parseInt(window.prompt("No-ball runs (default 1):", "1") || "1", 10) || 1; 
+                recordDeliveryWithAnimation({ type: "noball", runs: r }); 
+              }}>
+                ⚡ No Ball
+              </ExtrasButton>
+              <ExtrasButton onClick={() => { 
+                const r = parseInt(window.prompt("Bye runs (default 1):", "1") || "1", 10) || 1; 
+                recordDeliveryWithAnimation({ type: "bye", runs: r }); 
+              }}>
+                ➡️ Bye
+              </ExtrasButton>
+              <ExtrasButton onClick={() => { 
+                const r = parseInt(window.prompt("Leg-bye runs (default 1):", "1") || "1", 10) || 1; 
+                recordDeliveryWithAnimation({ type: "legbye", runs: r }); 
+              }}>
+                ↗️ Leg Bye
+              </ExtrasButton>
+            </ActionButtons>
+            
+            <CardTitle style={{ fontSize: '1.1rem' }} darkMode={darkMode}>Match Controls</CardTitle>
+            <ActionButtons>
+              <Button onClick={undo}>↩️ Undo</Button>
+              <Button onClick={() => retire("S")}>🏃 Retire Striker</Button>
+              <Button onClick={() => retire("N")}>🏃 Retire Non-Striker</Button>
+              <Button onClick={swapBats}>🔄 Swap Batsmen</Button>
+              <Button onClick={changeBowler}>🎯 Change Bowler</Button>
+            </ActionButtons>
+          </MobileCard>
+          
+          <MobileCard darkMode={darkMode}>
+            <CardTitle darkMode={darkMode}>Bowler Stats</CardTitle>
+            <TableContainer>
+              <Table darkMode={darkMode}>
+                <thead>
+                  <tr>
+                    <th>Bowler</th>
+                    <th>O</th>
+                    <th>R</th>
+                    <th>W</th>
+                    <th>Econ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(bowlerStats).map(([name, s]) => {
+                    const econ = s.balls > 0 ? (s.runs / (s.balls / 6)).toFixed(2) : "-";
+                    return (
+                      <tr key={name}>
+                        <td>{name}{name === currentBowler ? " (current)" : ""}</td>
+                        <td>{formatOvers(s.balls)}</td>
+                        <td>{s.runs}</td>
+                        <td>{s.wickets}</td>
+                        <td>{econ}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            </TableContainer>
+            <div style={{ marginTop: '1rem' }}>
+              <strong>Overs:</strong> {formatOvers(balls)}
+            </div>
+          </MobileCard>
+        </MobileScorecard>
+      </MainContent>
+
+      {/* Milestone Notification */}
+      {milestoneNotification && (
+        <MilestoneNotification>
+          <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>
+            {milestoneNotification.type === 'batting' ? '🏏' : '🎯'} {milestoneNotification.milestone}!
+          </div>
+          <div>
+            {milestoneNotification.player}: {milestoneNotification.type === 'batting' ? 
+              `${milestoneNotification.runs} runs` : 
+              `${milestoneNotification.wickets} wickets`
+            }
+          </div>
+        </MilestoneNotification>
+      )}
+
+      {/* Manual Runs Modal */}
+      {manualRunsOpen && (
+        <Modal>
+          <ManualRunsModal darkMode={darkMode}>
+            <ManualRunsHeader>
+              <h3>Manual Runs</h3>
+            </ManualRunsHeader>
+            
+            <RunsButtonGrid>
+              <RunsButton onClick={() => { 
+                recordDeliveryWithAnimation({ type: "manual", runs: 0 }); 
+                setManualRunsOpen(false); 
+              }}>
+                0
+              </RunsButton>
+              <RunsButton onClick={() => { 
+                recordDeliveryWithAnimation({ type: "manual", runs: 1 }); 
+                setManualRunsOpen(false); 
+              }}>
+                1
+              </RunsButton>
+              <RunsButton onClick={() => { 
+                recordDeliveryWithAnimation({ type: "manual", runs: 2 }); 
+                setManualRunsOpen(false); 
+              }}>
+                2
+              </RunsButton>
+              <RunsButton onClick={() => { 
+                recordDeliveryWithAnimation({ type: "manual", runs: 3 }); 
+                setManualRunsOpen(false); 
+              }}>
+                3
+              </RunsButton>
+              <RunsButton onClick={() => { 
+                recordDeliveryWithAnimation({ type: "manual", runs: 4 }); 
+                setManualRunsOpen(false); 
+              }}>
+                4
+              </RunsButton>
+              <RunsButton onClick={() => { 
+                recordDeliveryWithAnimation({ type: "manual", runs: 6 }); 
+                setManualRunsOpen(false); 
+              }}>
+                6
+              </RunsButton>
+              <RunsButton negative onClick={() => { 
+                recordDeliveryWithAnimation({ type: "manual", runs: -1 }); 
+                setManualRunsOpen(false); 
+              }}>
+                -1
+              </RunsButton>
+              <RunsButton negative onClick={() => { 
+                recordDeliveryWithAnimation({ type: "manual", runs: -2 }); 
+                setManualRunsOpen(false); 
+              }}>
+                -2
+              </RunsButton>
+              <RunsButton negative onClick={() => { 
+                recordDeliveryWithAnimation({ type: "manual", runs: -3 }); 
+                setManualRunsOpen(false); 
+              }}>
+                -3
+              </RunsButton>
+            </RunsButtonGrid>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+              <Button onClick={() => setManualRunsOpen(false)}>Cancel</Button>
+            </div>
+          </ManualRunsModal>
+        </Modal>
+      )}
+
+      {/* Negative-run Yes/No modal */}
+      {pendingNegative !== null && !wicketPanelOpen && (
+        <Modal>
+          <ModalContent darkMode={darkMode}>
+            <ModalHeader>
+              <ModalTitle darkMode={darkMode}>Negative runs entered</ModalTitle>
+              <CloseButton onClick={() => setPendingNegative(null)}>×</CloseButton>
+            </ModalHeader>
+            <p>Negative runs: <strong>{pendingNegative}</strong></p>
+            <p>Is the batsman out?</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+              <Button onClick={() => setPendingNegative(null)}>Cancel</Button>
+              <Button onClick={() => handleNegativeConfirm(false)}>No</Button>
+              <Button primary onClick={() => handleNegativeConfirm(true)}>Yes</Button>
+            </div>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {/* Enhanced Wicket Panel */}
+      {wicketPanelOpen && (
+        <Modal>
+          <WicketModal darkMode={darkMode}>
+            <WicketHeader>
+              <h2 style={{ margin: 0, fontSize: '1.5rem' }}>🏏 Wicket Details</h2>
+              <p style={{ margin: '0.5rem 0 0 0', opacity: 0.9 }}>Record the dismissal details</p>
+            </WicketHeader>
+            
+            <WicketFormSection darkMode={darkMode}>
+              <WicketSectionTitle darkMode={darkMode}>Basic Information</WicketSectionTitle>
+              <FormRow>
+                <FormColumn>
+                  <label>Who out (S/N) — informational:</label>
+                  <Select value={wicketForm.outName} onChange={(e) => setWicketForm((w) => ({ ...w, outName: e.target.value }))} darkMode={darkMode}>
+                    <option value={striker}>{striker}</option>
+                    <option value={nonStriker}>{nonStriker}</option>
+                  </Select>
+                </FormColumn>
+                <FormColumn>
+                  <label>How out:</label>
+                  <Select value={wicketForm.method} onChange={(e) => { 
+                    const v = e.target.value; 
+                    setWicketForm((w) => ({ ...w, method: v, isRunOut: v === "Run Out" })); 
+                  }} darkMode={darkMode}>
+                    <option>Bowled</option>
+                    <option>Caught</option>
+                    <option>Run Out</option>
+                    <option>LBW</option>
+                    <option>Stumped</option>
+                    <option>Hit Wicket</option>
+                    <option>Handled the ball</option>
+                    <option>Obstructing the field</option>
+                  </Select>
+                </FormColumn>
+              </FormRow>
+              
+              <FormRow>
+                <FormColumn>
+                  <label>Who helped (optional):</label>
+                  <Input 
+                    value={wicketForm.helper} 
+                    onChange={(e) => setWicketForm((w) => ({ ...w, helper: e.target.value }))} 
+                    placeholder="fielder name / catcher etc."
+                    darkMode={darkMode}
+                  />
+                </FormColumn>
+              </FormRow>
+            </WicketFormSection>
+            
+            <WicketFormSection darkMode={darkMode}>
+              <WicketSectionTitle darkMode={darkMode}>New Batsman</WicketSectionTitle>
+              <FormRow>
+                <FormColumn>
+                  <label>New batsman name (required):</label>
+                  <Input 
+                    value={wicketForm.newBatsman} 
+                    onChange={(e) => setWicketForm((w) => ({ ...w, newBatsman: e.target.value }))} 
+                    placeholder="Enter new batsman name" 
+                    style={{ border: wicketForm.newBatsman ? '1px solid #ced4da' : '2px solid #dc3545' }}
+                    darkMode={darkMode}
+                  />
+                  {!wicketForm.newBatsman && <small style={{ color: '#dc3545' }}>New batsman name is required</small>}
+                </FormColumn>
+              </FormRow>
+            </WicketFormSection>
+            
+            {wicketForm.isRunOut && (
+              <WicketFormSection darkMode={darkMode}>
+                <WicketSectionTitle darkMode={darkMode}>Run Out Details</WicketSectionTitle>
+                <FormRow>
+                  <FormColumn>
+                    <label>Which batter got out:</label>
+                    <Select value={wicketForm.runOutWhichBatter} onChange={(e) => setWicketForm((w) => ({ ...w, runOutWhichBatter: e.target.value }))} darkMode={darkMode}>
+                      <option value="Striker">Striker</option>
+                      <option value="Non-Striker">Non-Striker</option>
+                    </Select>
+                  </FormColumn>
+                  <FormColumn>
+                    <label>Which end got out:</label>
+                    <Select value={wicketForm.runOutEnd} onChange={(e) => setWicketForm((w) => ({ ...w, runOutEnd: e.target.value }))} darkMode={darkMode}>
+                      <option>Striker End</option>
+                      <option>Non-Striker End</option>
+                    </Select>
+                  </FormColumn>
+                </FormRow>
+                
+                <FormRow>
+                  <FormColumn>
+                    <label>Runs scored before run out:</label>
+                    <Input 
+                      type="number" 
+                      value={wicketForm.runsBefore} 
+                      onChange={(e) => setWicketForm((w) => ({ ...w, runsBefore: Number(e.target.value) || 0 }))} 
+                      min="0"
+                      darkMode={darkMode}
+                    />
+                  </FormColumn>
+                </FormRow>
+              </WicketFormSection>
+            )}
+            
+            <WicketButtonGroup>
+              <WicketCancelButton onClick={() => { setWicketPanelOpen(false); setPendingNegative(null); }}>
+                Cancel
+              </WicketCancelButton>
+              <WicketSubmitButton onClick={submitWicketPanel}>
+                Record Wicket
+              </WicketSubmitButton>
+            </WicketButtonGroup>
+          </WicketModal>
+        </Modal>
+      )}
+
+      {/* Bowler Selection Modal */}
+      {bowlerSelectionOpen && (
+        <Modal>
+          <BowlerSelectionModal darkMode={darkMode}>
+            <BowlerSelectionHeader>
+              <h3>Select Bowler</h3>
+            </BowlerSelectionHeader>
+            
+            <FormRow>
+              <FormColumn>
+                <Input 
+                  placeholder="New bowler name" 
+                  value={newBowlerName} 
+                  onChange={(e) => setNewBowlerName(e.target.value)}
+                  darkMode={darkMode}
+                />
+              </FormColumn>
+              <FormColumn>
+                <Button onClick={addBowler}>Add Bowler</Button>
+              </FormColumn>
+            </FormRow>
+            
+            <BowlerList>
+              {savedBowlers.map((bowler, index) => (
+                <BowlerOption 
+                  key={index} 
+                  onClick={() => selectBowler(bowler)}
+                  selected={currentBowler === bowler}
+                  darkMode={darkMode}
+                >
+                  {bowler}
+                </BowlerOption>
+              ))}
+            </BowlerList>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+              <Button onClick={() => setBowlerSelectionOpen(false)}>Cancel</Button>
+            </div>
+          </BowlerSelectionModal>
+        </Modal>
+      )}
+
+      {/* Start Second Innings Modal */}
+      {startSecondOpen && (
+        <Modal>
+          <ModalContent darkMode={darkMode}>
+            <ModalHeader>
+              <ModalTitle darkMode={darkMode}>Start Second Innings</ModalTitle>
+              <CloseButton onClick={() => setStartSecondOpen(false)}>×</CloseButton>
+            </ModalHeader>
+            <div style={{ marginBottom: '1rem' }}>
+              <div><strong>First innings:</strong> {firstInningsDetail ? `${firstInningsDetail.totalRuns}/${firstInningsDetail.totalWickets} (${formatOvers(firstInningsDetail.balls)}) by ${firstInningsDetail.battingTeam}` : ""}</div>
+              <div style={{ marginTop: '0.5rem' }}><strong>Target:</strong> {firstInningsScore !== null ? firstInningsScore + 1 : ""}</div>
+            </div>
+            <hr />
+            
+            <FormRow>
+              <FormColumn>
+                <label>Striker batsman:</label>
+                <Input 
+                  value={secondStriker} 
+                  onChange={(e) => setSecondStriker(e.target.value)} 
+                  placeholder="Striker name"
+                  darkMode={darkMode}
+                />
+              </FormColumn>
+              <FormColumn>
+                <label>Non-striker batsman:</label>
+                <Input 
+                  value={secondNonStriker} 
+                  onChange={(e) => setSecondNonStriker(e.target.value)} 
+                  placeholder="Non-striker name"
+                  darkMode={darkMode}
+                />
+              </FormColumn>
+            </FormRow>
+            
+            <FormRow>
+              <FormColumn>
+                <label>Bowler:</label>
+                <Input 
+                  value={secondBowler} 
+                  onChange={(e) => setSecondBowler(e.target.value)} 
+                  placeholder="Bowler name"
+                  darkMode={darkMode}
+                />
+              </FormColumn>
+            </FormRow>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+              <Button onClick={() => setStartSecondOpen(false)}>Cancel</Button>
+              <Button primary onClick={startSecondInnings}>Start Second Innings</Button>
+            </div>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {/* Final Summary Modal */}
+      {finalModalOpen && secondInningsDetail && (
+        <Modal>
+          <ModalContent style={{ maxWidth: '900px' }} darkMode={darkMode}>
+            <ModalHeader>
+              <ModalTitle darkMode={darkMode}>Final Scorecard</ModalTitle>
+              <CloseButton onClick={() => setFinalModalOpen(false)}>×</CloseButton>
+            </ModalHeader>
+            <div id="final-scorecard">
+              <div style={{ marginBottom: '1rem' }}>
+                <strong>{team1} vs {team2}</strong>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                <Card style={{ flex: '1', minWidth: '300px' }} darkMode={darkMode}>
+                  <CardTitle darkMode={darkMode}>First Innings — {firstInningsDetail ? firstInningsDetail.battingTeam : ""}</CardTitle>
+                  {firstInningsDetail ? (
+                    <>
+                      <div><strong>Score:</strong> {firstInningsDetail.totalRuns}/{firstInningsDetail.totalWickets} ({formatOvers(firstInningsDetail.balls)})</div>
+                      <Table darkMode={darkMode}>
+                        <thead>
+                          <tr>
+                            <th>Batsman</th>
+                            <th>R</th>
+                            <th>B</th>
+                            <th>4s</th>
+                            <th>6s</th>
+                            <th>SR</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.values(firstInningsDetail.batsmen || {}).map((b) => {
+                            const sr = b.balls > 0 ? ((b.runs / b.balls) * 100).toFixed(1) : "-";
+                            return (
+                              <tr key={b.name}>
+                                <td>{b.name}</td>
+                                <td>{b.runs}</td>
+                                <td>{b.balls}</td>
+                                <td>{b.fours}</td>
+                                <td>{b.sixes}</td>
+                                <td>{sr}</td>
+                                <td>{b.status}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </Table>
+                      <div style={{ marginTop: '0.5rem' }}><strong>Extras:</strong> {firstInningsDetail.extras || 0}</div>
+
+                      <div style={{ marginTop: '1rem' }}>
+                        <h4>Bowling</h4>
+                        <Table darkMode={darkMode}>
+                          <thead>
+                            <tr>
+                              <th>Bowler</th>
+                              <th>O</th>
+                              <th>R</th>
+                              <th>W</th>
+                              <th>Econ</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Object.entries(firstInningsDetail.bowlerStats || {}).map(([name, s]) => {
+                              const econ = s.balls > 0 ? (s.runs / (s.balls / 6)).toFixed(2) : "-";
+                              return (
+                                <tr key={name}>
+                                  <td>{name}</td>
+                                  <td>{formatOvers(s.balls)}</td>
+                                  <td>{s.runs}</td>
+                                  <td>{s.wickets}</td>
+                                  <td>{econ}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </Table>
+                      </div>
+                    </>
+                  ) : <div>No data</div>}
+                </Card>
+
+                <Card style={{ flex: '1', minWidth: '300px' }} darkMode={darkMode}>
+                  <CardTitle darkMode={darkMode}>Second Innings — {secondInningsDetail.battingTeam}</CardTitle>
+                  <div><strong>Score:</strong> {secondInningsDetail.totalRuns}/{secondInningsDetail.totalWickets} ({formatOvers(secondInningsDetail.balls)})</div>
+                  <Table darkMode={darkMode}>
+                    <thead>
+                      <tr>
+                        <th>Batsman</th>
+                        <th>R</th>
+                        <th>B</th>
+                        <th>4s</th>
+                        <th>6s</th>
+                        <th>SR</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.values(secondInningsDetail.batsmen || {}).map((b) => {
+                        const sr = b.balls > 0 ? ((b.runs / b.balls) * 100).toFixed(1) : "-";
+                        return (
+                          <tr key={b.name}>
+                            <td>{b.name}</td>
+                            <td>{b.runs}</td>
+                            <td>{b.balls}</td>
+                            <td>{b.fours}</td>
+                            <td>{b.sixes}</td>
+                            <td>{sr}</td>
+                            <td>{b.status}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </Table>
+                  <div style={{ marginTop: '0.5rem' }}><strong>Extras:</strong> {secondInningsDetail.extras || 0}</div>
+
+                  <div style={{ marginTop: '1rem' }}>
+                    <h4>Bowling</h4>
+                    <Table darkMode={darkMode}>
+                      <thead>
+                        <tr>
+                          <th>Bowler</th>
+                          <th>O</th>
+                          <th>R</th>
+                          <th>W</th>
+                          <th>Econ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(secondInningsDetail.bowlerStats || {}).map(([name, s]) => {
+                          const econ = s.balls > 0 ? (s.runs / (s.balls / 6)).toFixed(2) : "-";
+                          return (
+                            <tr key={name}>
+                              <td>{name}</td>
+                              <td>{formatOvers(s.balls)}</td>
+                              <td>{s.runs}</td>
+                              <td>{s.wickets}</td>
+                              <td>{econ}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </Table>
+                  </div>
+                </Card>
+              </div>
+
+              <Card style={{ marginTop: '1rem' }} darkMode={darkMode}>
+                <CardTitle darkMode={darkMode}>Result</CardTitle>
+                <h3>{secondInningsDetail.resultText}</h3>
+              </Card>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+              <Button onClick={() => { setFinalModalOpen(false); setPage("setup"); }}>Return Home</Button>
+              <Button primary onClick={downloadFinalPDFAndExit}>Download PDF & Return</Button>
+            </div>
+          </ModalContent>
+        </Modal>
+      )}
+    </AppContainer>
+  );
+}
