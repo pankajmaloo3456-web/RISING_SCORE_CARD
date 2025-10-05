@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import styled, { css, keyframes } from "styled-components";
-import { Line } from 'react-chartjs-2';
 import 'chart.js/auto';
 
 /* Utility helpers */
@@ -103,12 +102,12 @@ const Card = styled.div`
   background: ${props => props.darkMode ? '#2a2a2a' : 'white'};
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  padding: 1rem;
+  padding: 1.5rem;
   margin-bottom: 1.5rem;
   transition: all 0.3s ease;
   
   ${media.desktop(css`
-    padding: 1.5rem;
+    padding: 2rem;
   `)}
 `;
 
@@ -118,10 +117,10 @@ const CardTitle = styled.h2`
   border-bottom: 2px solid ${props => props.darkMode ? '#444' : '#eaeaea'};
   padding-bottom: 0.5rem;
   margin-bottom: 1rem;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   
   ${media.desktop(css`
-    font-size: 1.4rem;
+    font-size: 1.5rem;
   `)}
 `;
 
@@ -130,20 +129,20 @@ const Button = styled.button`
   color: white;
   border: none;
   padding: 0.75rem 1rem;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s;
   margin: 0.25rem;
   font-size: 0.9rem;
-  min-height: 44px; // Minimum touch target size
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   
   ${media.desktop(css`
-    padding: 0.5rem 1rem;
+    padding: 0.75rem 1.25rem;
     font-size: 1rem;
   `)}
   
@@ -163,11 +162,14 @@ const Input = styled.input`
   border: 1px solid ${props => props.darkMode ? '#555' : '#ced4da'};
   border-radius: 4px;
   width: 100%;
-  margin-bottom: 1rem;
-  font-size: 1rem;
-  min-height: 44px; // Minimum touch target size
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  min-height: 44px;
   background-color: ${props => props.darkMode ? '#333' : 'white'};
   color: ${props => props.darkMode ? '#e0e0e0' : '#333'};
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  text-transform: uppercase;
   
   &:focus {
     outline: none;
@@ -181,11 +183,14 @@ const Select = styled.select`
   border: 1px solid ${props => props.darkMode ? '#555' : '#ced4da'};
   border-radius: 4px;
   width: 100%;
-  margin-bottom: 1rem;
-  font-size: 1rem;
-  min-height: 44px; // Minimum touch target size
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  min-height: 44px;
   background-color: ${props => props.darkMode ? '#333' : 'white'};
   color: ${props => props.darkMode ? '#e0e0e0' : '#333'};
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  text-transform: uppercase;
   
   &:focus {
     outline: none;
@@ -202,35 +207,40 @@ const FormRow = styled.div`
   
   ${media.mobile(css`
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.75rem;
   `)}
 `;
 
 const FormColumn = styled.div`
   flex: 1;
   min-width: 200px;
+  
+  ${media.mobile(css`
+    min-width: 100%;
+  `)}
 `;
 
 const TableContainer = styled.div`
   overflow-x: auto;
   margin-bottom: 1rem;
-  -webkit-overflow-scrolling: touch; // For smooth scrolling on iOS
+  -webkit-overflow-scrolling: touch;
 `;
 
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 1rem;
-  min-width: 600px; // Ensure table doesn't get too cramped
+  min-width: 600px;
   
   th, td {
     padding: 0.75rem;
     text-align: left;
     border-bottom: 1px solid ${props => props.darkMode ? '#444' : '#dee2e6'};
+    font-size: 0.9rem;
     
     ${media.mobile(css`
       padding: 0.5rem;
-      font-size: 0.9rem;
+      font-size: 0.8rem;
     `)}
   }
   
@@ -238,6 +248,11 @@ const Table = styled.table`
     background-color: ${props => props.darkMode ? '#333' : '#f8f9fa'};
     font-weight: 600;
     color: ${props => props.darkMode ? '#e0e0e0' : '#495057'};
+    font-size: 0.95rem;
+    
+    ${media.mobile(css`
+      font-size: 0.85rem;
+    `)}
   }
   
   tr:nth-child(even) {
@@ -272,11 +287,16 @@ const ScoreMain = styled.div`
   ${media.desktop(css`
     font-size: 3rem;
   `)}
+  
+  ${media.mobile(css`
+    font-size: 2rem;
+  `)}
 `;
 
 const ScoreDetails = styled.div`
   font-size: 1rem;
   opacity: 0.9;
+  margin: 0.5rem 0;
   
   ${media.desktop(css`
     font-size: 1.2rem;
@@ -289,15 +309,22 @@ const RunRateDisplay = styled.div`
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.2);
+  
+  ${media.mobile(css`
+    flex-direction: column;
+    gap: 0.5rem;
+  `)}
 `;
 
 const RunRateItem = styled.div`
   text-align: center;
+  padding: 0.5rem;
 `;
 
 const RunRateLabel = styled.div`
   font-size: 0.8rem;
   opacity: 0.8;
+  margin-bottom: 0.25rem;
 `;
 
 const RunRateValue = styled.div`
@@ -328,6 +355,11 @@ const ModalContent = styled.div`
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  
+  ${media.mobile(css`
+    padding: 1rem;
+    max-width: 95%;
+  `)}
   
   ${media.desktop(css`
     padding: 2rem;
@@ -446,6 +478,11 @@ const TeamInfo = styled.div`
   margin-bottom: 1rem;
   flex-wrap: wrap;
   gap: 1rem;
+  
+  ${media.mobile(css`
+    flex-direction: column;
+    align-items: flex-start;
+  `)}
 `;
 
 const MatchInfo = styled.div`
@@ -474,6 +511,11 @@ const TeamLogo = styled.img`
   border-radius: 50%;
   object-fit: cover;
   margin-right: 0.5rem;
+  
+  ${media.mobile(css`
+    width: 30px;
+    height: 30px;
+  `)}
 `;
 
 const TeamNameWithLogo = styled.div`
@@ -493,6 +535,11 @@ const InitialPlayersDisplay = styled.div`
   align-items: center;
   flex-wrap: wrap;
   gap: 1rem;
+  
+  ${media.mobile(css`
+    flex-direction: column;
+    gap: 0.5rem;
+  `)}
 `;
 
 const PlayerRole = styled.div`
@@ -615,12 +662,11 @@ const PartnershipTitle = styled.h4`
 const PartnershipDetails = styled.div`
   display: flex;
   justify-content: space-between;
-`;
-
-// Chart container
-const ChartContainer = styled.div`
-  height: 200px;
-  margin: 1rem 0;
+  
+  ${media.mobile(css`
+    flex-direction: column;
+    gap: 0.25rem;
+  `)}
 `;
 
 // Milestone notification
@@ -636,6 +682,12 @@ const MilestoneNotification = styled.div`
   z-index: 1001;
   animation: ${milestoneAnimation} 1s ease-in-out;
   max-width: 300px;
+  
+  ${media.mobile(css`
+    max-width: 250px;
+    right: 10px;
+    top: 10px;
+  `)}
 `;
 
 // Bowler selection modal
@@ -701,27 +753,6 @@ const ManualRunsHeader = styled.div`
   `)}
 `;
 
-const RunsButtonGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-`;
-
-const RunsButton = styled(Button)`
-  min-height: 60px;
-  font-size: 1.2rem;
-  font-weight: bold;
-  
-  ${props => props.negative && css`
-    background: #dc3545;
-    
-    &:hover {
-      background: #c82333;
-    }
-  `}
-`;
-
 // File upload for team logos
 const FileUpload = styled.div`
   position: relative;
@@ -756,6 +787,11 @@ const TeamSetupContainer = styled.div`
   display: flex;
   align-items: center;
   gap: 1rem;
+  
+  ${media.mobile(css`
+    flex-direction: column;
+    gap: 0.75rem;
+  `)}
 `;
 
 const TeamLogoContainer = styled.div`
@@ -767,6 +803,11 @@ const TeamLogoContainer = styled.div`
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  
+  ${media.mobile(css`
+    width: 50px;
+    height: 50px;
+  `)}
 `;
 
 const TeamLogoPreview = styled.img`
@@ -777,6 +818,76 @@ const TeamLogoPreview = styled.img`
 
 const TeamDetails = styled.div`
   flex: 1;
+`;
+
+// Required runs display
+const RequiredRunsDisplay = styled.div`
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-top: 0.5rem;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  display: inline-block;
+  
+  ${media.mobile(css`
+    font-size: 1rem;
+    padding: 0.4rem 0.8rem;
+  `)}
+`;
+
+// Extras breakdown display
+const ExtrasBreakdown = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  justify-content: center;
+  
+  ${media.mobile(css`
+    justify-content: flex-start;
+  `)}
+`;
+
+const ExtraItem = styled.span`
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+`;
+
+// Over details table
+const OverDetailsTable = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  
+  th, td {
+    padding: 0.5rem;
+    text-align: center;
+    border: 1px solid ${props => props.darkMode ? '#444' : '#dee2e6'};
+    font-size: 0.9rem;
+    
+    ${media.mobile(css`
+      padding: 0.4rem;
+      font-size: 0.8rem;
+    `)}
+  }
+  
+  th {
+    background-color: ${props => props.darkMode ? '#333' : '#f8f9fa'};
+    font-weight: 600;
+    color: ${props => props.darkMode ? '#e0e0e0' : '#495057'};
+  }
+  
+  .ball-cell {
+    width: 16.66%;
+  }
+  
+  .runs-cell {
+    font-weight: bold;
+  }
 `;
 
 export default function App() {
@@ -810,19 +921,9 @@ export default function App() {
   const [currentRunRate, setCurrentRunRate] = useState(0);
   const [requiredRunRate, setRequiredRunRate] = useState(0);
   
-  // Chart data
-  const [runRateData, setRunRateData] = useState({
-    labels: [],
-    datasets: [
-      {
-        label: 'Run Rate',
-        data: [],
-        fill: false,
-        backgroundColor: '#4a7c28',
-        borderColor: '#4a7c28',
-      }
-    ]
-  });
+  // Over details tracking
+  const [currentOverBalls, setCurrentOverBalls] = useState(Array(6).fill(null));
+  const [deliveryHistory, setDeliveryHistory] = useState([]);
   
   // Bowler selection modal
   const [bowlerSelectionOpen, setBowlerSelectionOpen] = useState(false);
@@ -831,6 +932,7 @@ export default function App() {
   
   // Manual runs modal
   const [manualRunsOpen, setManualRunsOpen] = useState(false);
+  const [manualRunsValue, setManualRunsValue] = useState("");
   
   // Player squads
   const [team1Squad, setTeam1Squad] = useState([]);
@@ -874,8 +976,14 @@ export default function App() {
   const [secondInningsDetail, setSecondInningsDetail] = useState(null);
   const [finalModalOpen, setFinalModalOpen] = useState(false);
 
-  // extras
-  const [extras, setExtras] = useState(0);
+  // extras breakdown
+  const [extrasBreakdown, setExtrasBreakdown] = useState({
+    wides: 0,
+    noBalls: 0,
+    byes: 0,
+    legByes: 0,
+    negative: 0
+  });
 
   // pending negative runs (for modal)
   const [pendingNegative, setPendingNegative] = useState(null);
@@ -898,27 +1006,6 @@ export default function App() {
   const [secondStriker, setSecondStriker] = useState("");
   const [secondNonStriker, setSecondNonStriker] = useState("");
   const [secondBowler, setSecondBowler] = useState("");
-
-  // Chart options
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      y: {
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Run Rate'
-        }
-      },
-      x: {
-        title: {
-          display: true,
-          text: 'Overs'
-        }
-      }
-    }
-  };
 
   // Handle team logo upload
   const handleTeamLogoUpload = (team, e) => {
@@ -989,13 +1076,22 @@ export default function App() {
     return (runs / (balls / 6)).toFixed(2);
   };
 
-  // Calculate required run rate for second innings
+  // Calculate required run rate for second innings - FIXED
   const calculateRequiredRunRate = () => {
     if (innings !== 2 || !target || !oversLimitNum) return 0;
-    const remainingRuns = target - totalRuns;
-    const remainingBalls = oversLimitNum * 6 - balls;
-    if (remainingBalls <= 0) return 0;
-    return ((remainingRuns / (remainingBalls / 6))).toFixed(2);
+    const runsNeeded = target - totalRuns;
+    const ballsRemaining = oversLimitNum * 6 - balls;
+    const oversRemaining = ballsRemaining / 6;
+    if (oversRemaining <= 0) return 0;
+    return (runsNeeded / oversRemaining).toFixed(2);
+  };
+
+  // Calculate required runs and balls remaining
+  const calculateRequiredRunsAndBalls = () => {
+    if (innings !== 2 || !target || !oversLimitNum) return { runs: 0, balls: 0 };
+    const runsNeeded = target - totalRuns;
+    const ballsRemaining = oversLimitNum * 6 - balls;
+    return { runs: runsNeeded, balls: ballsRemaining };
   };
 
   // Update partnership
@@ -1023,33 +1119,6 @@ export default function App() {
         // You could store this in a partnerships array if needed
       }
     }
-  };
-
-  // Update run rate chart
-  const updateRunRateChart = () => {
-    const over = Math.floor(balls / 6) + (balls % 6 > 0 ? 0.1 : 0);
-    const runRate = calculateRunRate(totalRuns, balls);
-    
-    setRunRateData(prevData => {
-      const newLabels = [...prevData.labels, over];
-      const newData = [...prevData.datasets[0].data, runRate];
-      
-      // Keep only last 20 overs for readability
-      if (newLabels.length > 20) {
-        newLabels.shift();
-        newData.shift();
-      }
-      
-      return {
-        labels: newLabels,
-        datasets: [
-          {
-            ...prevData.datasets[0],
-            data: newData
-          }
-        ]
-      };
-    });
   };
 
   // Add bowler to saved list
@@ -1115,12 +1184,15 @@ export default function App() {
       nonStriker,
       currentBowler,
       oversLimitNum,
-      extras,
+      extras: Object.values(extrasBreakdown).reduce((sum, val) => sum + val, 0),
+      extrasBreakdown: clone(extrasBreakdown),
       pendingNegative,
       innings,
       battingTeam,
       firstInningsScore,
       target,
+      currentOverBalls: [...currentOverBalls],
+      deliveryHistory: [...deliveryHistory]
     };
     setHistory((h) => [...h, snap]);
   };
@@ -1135,12 +1207,20 @@ export default function App() {
     setNonStriker(snap.nonStriker);
     setCurrentBowler(snap.currentBowler);
     setOversLimitNum(snap.oversLimitNum);
-    setExtras(snap.extras || 0);
+    setExtrasBreakdown(snap.extrasBreakdown || {
+      wides: 0,
+      noBalls: 0,
+      byes: 0,
+      legByes: 0,
+      negative: 0
+    });
     setPendingNegative(snap.pendingNegative || null);
     setInnings(snap.innings || 1);
     setBattingTeam(snap.battingTeam || "");
     setFirstInningsScore(snap.firstInningsScore || null);
     setTarget(snap.target || null);
+    setCurrentOverBalls(snap.currentOverBalls || Array(6).fill(null));
+    setDeliveryHistory(snap.deliveryHistory || []);
   };
 
   const ensureBatsman = (name, copy) => {
@@ -1192,7 +1272,13 @@ export default function App() {
     setTotalWickets(0);
     setBalls(0);
     setHistory([]);
-    setExtras(0);
+    setExtrasBreakdown({
+      wides: 0,
+      noBalls: 0,
+      byes: 0,
+      legByes: 0,
+      negative: 0
+    });
     setPendingNegative(null);
     setOversLimitNum(oversLimit ? parseInt(oversLimit, 10) : null);
     setInnings(1);
@@ -1213,19 +1299,9 @@ export default function App() {
       startBall: 0
     });
     
-    // Initialize chart
-    setRunRateData({
-      labels: [0],
-      datasets: [
-        {
-          label: 'Run Rate',
-          data: [0],
-          fill: false,
-          backgroundColor: '#4a7c28',
-          borderColor: '#4a7c28',
-        }
-      ]
-    });
+    // Reset over balls
+    setCurrentOverBalls(Array(6).fill(null));
+    setDeliveryHistory([]);
     
     // Add current bowler to saved list if not already there
     if (setupBowler && !savedBowlers.includes(setupBowler)) {
@@ -1276,7 +1352,13 @@ export default function App() {
     setTotalWickets(0);
     setBalls(0);
     setHistory([]);
-    setExtras(0);
+    setExtrasBreakdown({
+      wides: 0,
+      noBalls: 0,
+      byes: 0,
+      legByes: 0,
+      negative: 0
+    });
     setPendingNegative(null);
 
     setBattingTeam(other);
@@ -1293,19 +1375,9 @@ export default function App() {
       startBall: 0
     });
     
-    // Reset chart
-    setRunRateData({
-      labels: [0],
-      datasets: [
-        {
-          label: 'Run Rate',
-          data: [0],
-          fill: false,
-          backgroundColor: '#4a7c28',
-          borderColor: '#4a7c28',
-        }
-      ]
-    });
+    // Reset over balls
+    setCurrentOverBalls(Array(6).fill(null));
+    setDeliveryHistory([]);
     
     // Add current bowler to saved list if not already there
     if (secondBowler && !savedBowlers.includes(secondBowler)) {
@@ -1370,12 +1442,24 @@ export default function App() {
       const econ = s.balls > 0 ? (s.runs / (s.balls / 6)).toFixed(2) : "-";
       return `<tr><td>${escapeHtml(name)}</td><td>${formatOvers(s.balls)}</td><td>${s.runs}</td><td>${s.wickets}</td><td>${econ}</td></tr>`;
     }).join("");
+    const extrasTotal = snap.extrasBreakdown ? 
+      Object.values(snap.extrasBreakdown).reduce((sum, val) => sum + val, 0) : 
+      (snap.extras || 0);
+    
+    let extrasBreakdownHtml = "";
+    if (snap.extrasBreakdown) {
+      const { wides, noBalls, byes, legByes, negative } = snap.extrasBreakdown;
+      extrasBreakdownHtml = `<div>Extras: ${extrasTotal} (Wide: ${wides}, No Ball: ${noBalls}, Bye: ${byes}, Leg Bye: ${legByes}, Negative: ${negative})</div>`;
+    } else {
+      extrasBreakdownHtml = `<div>Extras: ${extrasTotal}</div>`;
+    }
+    
     return `
       <table>
         <thead><tr><th>Batsman</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th><th>Status</th></tr></thead>
         <tbody>${batsRows}</tbody>
       </table>
-      <div>Extras: ${snap.extras || 0}</div>
+      ${extrasBreakdownHtml}
       <table>
         <thead><tr><th>Bowler</th><th>O</th><th>R</th><th>W</th><th>Econ</th></tr></thead>
         <tbody>${bowlRows}</tbody>
@@ -1389,8 +1473,8 @@ export default function App() {
   };
 
   const recordDelivery = ({ type, runs = 0, wicketDetails = null, extrasDelta = 0, skipNegativePrompt = false }) => {
-    pushSnapshot();let r = 0;
-
+    pushSnapshot();
+    let r = 0;
 
     let newTotalRuns = totalRuns;
     let newTotalWickets = totalWickets;
@@ -1399,6 +1483,9 @@ export default function App() {
     const bowlCopy = clone(bowlerStats);
     let newStriker = striker;
     let newNon = nonStriker;
+    let newExtrasBreakdown = clone(extrasBreakdown);
+    let newCurrentOverBalls = [...currentOverBalls];
+    let newDeliveryHistory = [...deliveryHistory];
 
     const startStriker = newStriker;
     const startNon = newNon;
@@ -1414,10 +1501,45 @@ export default function App() {
       newNon = tmp;
     };
 
+    // Record ball result for current over
+    const ballIndex = newBalls % 6;
+    const deliveryData = {
+      type,
+      runs,
+      wicketDetails,
+      ballIndex,
+      striker: newStriker,
+      nonStriker: newNon,
+      bowler: currentBowler
+    };
+    
+    // Add to delivery history
+    newDeliveryHistory.push(deliveryData);
+
+    // Record ball result for current over display
+    if (type === "run" || type === "manual") {
+      r = Number(runs) || 0;
+      if (r >= 0) {
+        newCurrentOverBalls[ballIndex] = r;
+      } else {
+        newCurrentOverBalls[ballIndex] = `-${Math.abs(r)}`;
+      }
+    } else if (type === "wicket") {
+      newCurrentOverBalls[ballIndex] = "W";
+    } else if (type === "wide") {
+      newCurrentOverBalls[ballIndex] = "WD";
+    } else if (type === "noball") {
+      newCurrentOverBalls[ballIndex] = "NB";
+    } else if (type === "bye") {
+      newCurrentOverBalls[ballIndex] = "B";
+    } else if (type === "legbye") {
+      newCurrentOverBalls[ballIndex] = "LB";
+    }
+
     // APPLY extrasDelta WITHOUT counting the ball (so wicket logic will handle the ball increment)
     if (extrasDelta && typeof extrasDelta === "number" && extrasDelta !== 0) {
       newTotalRuns += extrasDelta;
-      setExtras((prev) => prev + extrasDelta);
+      newExtrasBreakdown.negative += Math.abs(extrasDelta);
       if (currentBowler) {
         bowlCopy[currentBowler].runs += extrasDelta;
         // DO NOT increment bowlCopy[currentBowler].balls here — wicket logic counts the ball.
@@ -1427,7 +1549,7 @@ export default function App() {
 
     if (type === "run" || type === "manual") {
       // Fixed: Define 'r' properly before using it
-      const r = Number(runs) || 0;
+      r = Number(runs) || 0;
 
       // handle negative manual runs: show in-app Yes/No modal (unless skipNegativePrompt)
       if (type === "manual" && r < 0 && !skipNegativePrompt) {
@@ -1439,7 +1561,7 @@ export default function App() {
       // If skipNegativePrompt is true and r < 0, we apply negative runs directly (non-out path)
       if (type === "manual" && r < 0 && skipNegativePrompt) {
         newTotalRuns += r;
-        setExtras((prev) => prev + r);
+        newExtrasBreakdown.negative += Math.abs(r);
         if (currentBowler) {
           bowlCopy[currentBowler].runs += r;
           bowlCopy[currentBowler].balls += 1; // count the ball here for non-out negative
@@ -1455,6 +1577,9 @@ export default function App() {
         setBowlerStats(bowlCopy);
         setStriker(newStriker);
         setNonStriker(newNon);
+        setExtrasBreakdown(newExtrasBreakdown);
+        setCurrentOverBalls(newCurrentOverBalls);
+        setDeliveryHistory(newDeliveryHistory);
         // clear pending if any
         setPendingNegative(null);
 
@@ -1470,7 +1595,8 @@ export default function App() {
               balls: newBalls,
               batsmen: clone(batsCopy),
               bowlerStats: clone(bowlCopy),
-              extras: extras + (extrasDelta ? extrasDelta : 0),
+              extras: Object.values(newExtrasBreakdown).reduce((sum, val) => sum + val, 0),
+              extrasBreakdown: newExtrasBreakdown,
             };
             openFinalSummary(secondSnapshot, `${battingTeam} wins! (${newTotalRuns} / ${newTotalWickets})`);
             return;
@@ -1492,7 +1618,8 @@ export default function App() {
               balls: newBalls,
               batsmen: clone(batsCopy),
               bowlerStats: clone(bowlCopy),
-              extras: extras,
+              extras: Object.values(newExtrasBreakdown).reduce((sum, val) => sum + val, 0),
+              extrasBreakdown: newExtrasBreakdown,
             };
             openFinalSummary(secondSnapshot, resultText);
             return;
@@ -1533,31 +1660,33 @@ export default function App() {
     }
 
     else if (type === "wicket") {
-      const wd = wicketDetails || {};
-      const runOutInfo = wd.runOut || null;
+  const wd = wicketDetails || {};
+  const runOutInfo = wd.runOut || null;
 
-      // If runOut had runsBefore, apply them (this counts as part of wicket ball)
-      if (runOutInfo && Number(runOutInfo.runsBefore)) {
-        const runsBefore = Number(runOutInfo.runsBefore);
-        ensureBatsman(newStriker, batsCopy);
-        batsCopy[newStriker].runs += runsBefore;
-        batsCopy[newStriker].balls += 1;
-        newTotalRuns += runsBefore;
-        if (currentBowler) {
-          bowlCopy[currentBowler].runs += runsBefore;
-          bowlCopy[currentBowler].balls += 1;
-        }
-        newBalls += 1;
-        if (runsBefore % 2 === 1) swapLocalStrikes();
-      } else {
-        // count the legal ball for the wicket (only here)
-        newBalls += 1;
-        if (currentBowler) bowlCopy[currentBowler].balls += 1;
-      }
+  // If runOut had runsBefore, apply them (this counts as part of wicket ball)
+  if (runOutInfo && Number(runOutInfo.runsBefore)) {
+    const runsBefore = Number(runOutInfo.runsBefore);
+    ensureBatsman(newStriker, batsCopy);
+    batsCopy[newStriker].runs += runsBefore;
+    batsCopy[newStriker].balls += 1;
+    newTotalRuns += runsBefore;
+    if (currentBowler) {
+      bowlCopy[currentBowler].runs += runsBefore;
+      bowlCopy[currentBowler].balls += 1;
+    }
+    newBalls += 1;
+    if (runsBefore % 2 === 1) swapLocalStrikes();
+  } else {
+    // count the legal ball for the wicket (only here)
+    newBalls += 1;
+    if (currentBowler) bowlCopy[currentBowler].balls += 1;
 
-      if (runOutInfo) {
-        const end = runOutInfo.end || "Striker End";
-        const whoOutNorm = (runOutInfo.whoOut || "").toLowerCase();
+    // 🟢 FIX: Increment batsman balls for ALL wickets except run out (non-striker end)
+    if (runOutInfo) {
+      const end = runOutInfo.end || "Striker End";
+      const whoOutNorm = (runOutInfo.whoOut || "").toLowerCase();
+      // Only skip increment if it's run out and non-striker-end non-striker
+      if (!(end === "Non-Striker End" && whoOutNorm === "non-striker")) {
         let outBatterName =
           whoOutNorm === "striker"
             ? startStriker
@@ -1566,70 +1695,119 @@ export default function App() {
             : end === "Striker End"
             ? newStriker
             : newNon;
-
         ensureBatsman(outBatterName, batsCopy);
-        batsCopy[outBatterName].status = `out (Run Out)`;
+        batsCopy[outBatterName].balls += 1; // 🟢 INCREMENT BALL
+      }
+      // If run out non-striker, skip increment here
+    } else {
+      // regular wicket (bowled/caught/lbw/striker run-out etc) – always increment out batsman’s balls
+      let outName = wd.outName?.trim() || newStriker;
+      ensureBatsman(outName, batsCopy);
+      batsCopy[outName].balls += 1; // 🟢 INCREMENT BALL
+    }
+  }
 
-        const replacement = wd.newBatsman?.trim() || null;
-        const survivor = outBatterName === startStriker ? startNon : startStriker;
+  if (runOutInfo) {
+    const end = runOutInfo.end || "Striker End";
+    const whoOutNorm = (runOutInfo.whoOut || "").toLowerCase();
+    let outBatterName =
+      whoOutNorm === "striker"
+        ? startStriker
+        : whoOutNorm === "non-striker"
+        ? startNon
+        : end === "Striker End"
+        ? newStriker
+        : newNon;
 
-        const isLastBall = countsAsLegal && newBalls > 0 && newBalls % 6 === 0;
+    ensureBatsman(outBatterName, batsCopy);
+    batsCopy[outBatterName].status = `out (Run Out)`;
 
-        if (isLastBall) {
-          if (end === "Striker End") {
-            newStriker = survivor;
-            newNon = replacement || "-----";
-          } else {
-            newStriker = replacement || "-----";
-            newNon = survivor;
-          }
-        } else {
-          if (end === "Striker End") {
-            newStriker = replacement || "-----";
-            newNon = survivor;
-          } else {
-            newNon = replacement || "-----";
-            newStriker = survivor;
-          }
-        }
+    const replacement = wd.newBatsman?.trim() || null;
+    const survivor = outBatterName === startStriker ? startNon : startStriker;
 
-        if (replacement) {
-          batsCopy[replacement] = { name: replacement, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
-        }
+    const isLastBall = countsAsLegal && newBalls > 0 && newBalls % 6 === 0;
 
-        newTotalWickets += 1;
+    if (isLastBall) {
+      if (end === "Striker End") {
+        newStriker = survivor;
+        newNon = replacement || "-----";
       } else {
-        const method = wd.method || "Out";
-        let outName = wd.outName?.trim() || newStriker;
-        ensureBatsman(outName, batsCopy);
-        batsCopy[outName].status = `out (${method})`;
-        if (currentBowler && method !== "Run Out") bowlCopy[currentBowler].wickets += 1;
-        const replacement = wd.newBatsman?.trim();
-        if (replacement) {
-          batsCopy[replacement] = { name: replacement, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
-          if (outName === newStriker) newStriker = replacement;
-          else if (outName === newNon) newNon = replacement;
-          else newStriker = replacement;
-        } else {
-          if (outName === newStriker) newStriker = "-----";
-          else if (outName === newNon) newNon = "-----";
-        }
-        newTotalWickets += 1;
+        newStriker = replacement || "-----";
+        newNon = survivor;
+      }
+    } else {
+      if (end === "Striker End") {
+        newStriker = replacement || "-----";
+        newNon = survivor;
+      } else {
+        newNon = replacement || "-----";
+        newStriker = survivor;
       }
     }
 
-    else if (type === "wide" || type === "noball") {
-      // Fixed: Define 'r' properly before using it
-      const r = Number(runs) || 1;
+    if (replacement) {
+      batsCopy[replacement] = { name: replacement, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
+    }
+
+    newTotalWickets += 1;
+  } else {
+    const method = wd.method || "Out";
+    let outName = wd.outName?.trim() || newStriker;
+    ensureBatsman(outName, batsCopy);
+    batsCopy[outName].status = `out (${method})`;
+    if (currentBowler && method !== "Run Out") bowlCopy[currentBowler].wickets += 1;
+    const replacement = wd.newBatsman?.trim();
+    if (replacement) {
+      batsCopy[replacement] = { name: replacement, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
+      if (outName === newStriker) newStriker = replacement;
+      else if (outName === newNon) newNon = replacement;
+      else newStriker = replacement;
+    } else {
+      if (outName === newStriker) newStriker = "-----";
+      else if (outName === newNon) newNon = "-----";
+    }
+    newTotalWickets += 1;
+  }
+}
+
+
+    else if (type === "wide") {
+      r = Number(runs) || 1;
       newTotalRuns += r;
+      newExtrasBreakdown.wides += r;
       if (currentBowler) bowlCopy[currentBowler].runs += r;
       if (r > 0 && r % 2 === 0) swapLocalStrikes();
     }
 
-    else if (type === "bye" || type === "legbye") {
-      // Fixed: Define 'r' properly before using it
-      const r = Number(runs) || 1;
+    else if (type === "noball") {
+      r = Number(runs) || 1;
+      const batsmanRuns = r - 1; // 1 run is for no ball, rest goes to batsman
+      
+      // Add 1 run to extras for no ball
+      newTotalRuns += 1;
+      newExtrasBreakdown.noBalls += 1;
+      
+      // Add batsman runs to batsman and total
+      if (batsmanRuns > 0) {
+        ensureBatsman(newStriker, batsCopy);
+        batsCopy[newStriker].runs += batsmanRuns;
+        if (batsmanRuns === 4) batsCopy[newStriker].fours += 1;
+        if (batsmanRuns === 6) batsCopy[newStriker].sixes += 1;
+        newTotalRuns += batsmanRuns;
+        
+        // Swap strike if odd number of runs
+        if (batsmanRuns % 2 === 1) swapLocalStrikes();
+      }
+      
+      if (currentBowler) {
+        bowlCopy[currentBowler].runs += r;
+      }
+    }
+
+    else if (type === "bye") {
+      r = Number(runs) || 1;
       newTotalRuns += r;
+      newExtrasBreakdown.byes += r;
       if (currentBowler) {
         bowlCopy[currentBowler].runs += r;
         bowlCopy[currentBowler].balls += 1;
@@ -1640,6 +1818,32 @@ export default function App() {
       if (r % 2 === 1) swapLocalStrikes();
     }
 
+    else if (type === "legbye") {
+      r = Number(runs) || 1;
+      newTotalRuns += r;
+      newExtrasBreakdown.legByes += r;
+      if (currentBowler) {
+        bowlCopy[currentBowler].runs += r;
+        bowlCopy[currentBowler].balls += 1;
+      }
+      ensureBatsman(newStriker, batsCopy);
+      batsCopy[newStriker].balls += 1;
+      newBalls += 1;
+      if (r % 2 === 1) swapLocalStrikes();
+    }
+
+    // Check if over is complete and swap batsmen
+    if (countsAsLegal && newBalls > 0 && newBalls % 6 === 0) {
+      // Swap striker and non-striker at the end of the over
+      const tmp = newStriker;
+      newStriker = newNon;
+      newNon = tmp;
+      
+      // Reset over balls for next over
+      newCurrentOverBalls = Array(6).fill(null);
+      newDeliveryHistory = [];
+    }
+
     // apply the computed state (this ensures runs from this delivery are in place before match-end logic)
     setTotalRuns(newTotalRuns);
     setTotalWickets(newTotalWickets);
@@ -1648,6 +1852,9 @@ export default function App() {
     setBowlerStats(bowlCopy);
     setStriker(newStriker);
     setNonStriker(newNon);
+    setExtrasBreakdown(newExtrasBreakdown);
+    setCurrentOverBalls(newCurrentOverBalls);
+    setDeliveryHistory(newDeliveryHistory);
 
     // Update run rates
     const newRunRate = calculateRunRate(newTotalRuns, newBalls);
@@ -1667,9 +1874,6 @@ export default function App() {
       }));
     }
     
-    // Update chart
-    updateRunRateChart();
-    
     // Check for milestones
     checkMilestone(newTotalRuns, newTotalWickets);
 
@@ -1688,7 +1892,8 @@ export default function App() {
         balls: newBalls,
         batsmen: clone(batsCopy),
         bowlerStats: clone(bowlCopy),
-        extras,
+        extras: Object.values(newExtrasBreakdown).reduce((sum, val) => sum + val, 0),
+        extrasBreakdown: newExtrasBreakdown,
       };
       setFirstInningsScore(newTotalRuns);
       setTarget(newTotalRuns + 1);
@@ -1709,7 +1914,8 @@ export default function App() {
           balls: newBalls,
           batsmen: clone(batsCopy),
           bowlerStats: clone(bowlCopy),
-          extras,
+          extras: Object.values(newExtrasBreakdown).reduce((sum, val) => sum + val, 0),
+          extrasBreakdown: newExtrasBreakdown,
         };
         openFinalSummary(secondSnapshot, `${battingTeam} wins! (${newTotalRuns} / ${newTotalWickets})`);
         return;
@@ -1733,7 +1939,8 @@ export default function App() {
           balls: newBalls,
           batsmen: clone(batsCopy),
           bowlerStats: clone(bowlCopy),
-          extras,
+          extras: Object.values(newExtrasBreakdown).reduce((sum, val) => sum + val, 0),
+          extrasBreakdown: newExtrasBreakdown,
         };
         openFinalSummary(secondSnapshot, resultText);
         return;
@@ -1768,7 +1975,46 @@ export default function App() {
     }
     
     updatePartnership();
-    updateRunRateChart();
+    
+    // Reconstruct current over balls from history
+    const ballIndex = balls % 6;
+    const overStart = balls - ballIndex;
+    const newCurrentOverBalls = Array(6).fill(null);
+    
+    // Get the deliveries for the current over from history
+    const currentOverDeliveries = history.filter(snapshot => 
+      snapshot.balls >= overStart && snapshot.balls < overStart + 6
+    );
+    
+    // Reconstruct the current over balls from history
+    currentOverDeliveries.forEach(snapshot => {
+      const ballInOver = snapshot.balls - overStart;
+      if (ballInOver >= 0 && ballInOver < 6) {
+        if (snapshot.deliveryHistory && snapshot.deliveryHistory[ballInOver]) {
+          const delivery = snapshot.deliveryHistory[ballInOver];
+          if (delivery.type === "run" || delivery.type === "manual") {
+            const r = Number(delivery.runs) || 0;
+            if (r >= 0) {
+              newCurrentOverBalls[ballInOver] = r;
+            } else {
+              newCurrentOverBalls[ballInOver] = `-${Math.abs(r)}`;
+            }
+          } else if (delivery.type === "wicket") {
+            newCurrentOverBalls[ballInOver] = "W";
+          } else if (delivery.type === "wide") {
+            newCurrentOverBalls[ballInOver] = "WD";
+          } else if (delivery.type === "noball") {
+            newCurrentOverBalls[ballInOver] = "NB";
+          } else if (delivery.type === "bye") {
+            newCurrentOverBalls[ballInOver] = "B";
+          } else if (delivery.type === "legbye") {
+            newCurrentOverBalls[ballInOver] = "LB";
+          }
+        }
+      }
+    });
+    
+    setCurrentOverBalls(newCurrentOverBalls);
   };
 
   const swapBats = () => {
@@ -1874,6 +2120,13 @@ export default function App() {
     }
   };
 
+  const handleManualRunsSubmit = () => {
+    const runs = parseInt(manualRunsValue, 10) || 0;
+    recordDeliveryWithAnimation({ type: "manual", runs });
+    setManualRunsOpen(false);
+    setManualRunsValue("");
+  };
+
   const getOrderedBatsmen = () => {
     const used = new Set();
     const result = [];
@@ -1905,6 +2158,12 @@ export default function App() {
     });
 
     return result;
+  };
+
+  // Function to capitalize names
+  const capitalizeName = (name) => {
+    if (!name) return "";
+    return name.toUpperCase();
   };
 
   // UI: login
@@ -1969,7 +2228,7 @@ export default function App() {
                     <Input 
                       placeholder="Team 1" 
                       value={team1} 
-                      onChange={(e) => setTeam1(e.target.value)}
+                      onChange={(e) => setTeam1(capitalizeName(e.target.value))}
                       darkMode={darkMode}
                     />
                     <FileUpload>
@@ -2007,7 +2266,7 @@ export default function App() {
                     <Input 
                       placeholder="Team 2" 
                       value={team2} 
-                      onChange={(e) => setTeam2(e.target.value)}
+                      onChange={(e) => setTeam2(capitalizeName(e.target.value))}
                       darkMode={darkMode}
                     />
                     <FileUpload>
@@ -2031,7 +2290,7 @@ export default function App() {
             <FormRow>
               <FormColumn>
                 <label>Toss Winner:</label>
-                <Select value={tossWinner} onChange={(e) => setTossWinner(e.target.value)} darkMode={darkMode}>
+                <Select value={tossWinner} onChange={(e) => setTossWinner(capitalizeName(e.target.value))} darkMode={darkMode}>
                   <option value="">Select</option>
                   <option value={team1}>{team1 || "Team 1"}</option>
                   <option value={team2}>{team2 || "Team 2"}</option>
@@ -2061,7 +2320,7 @@ export default function App() {
                 <Input 
                   placeholder="Ground" 
                   value={ground} 
-                  onChange={(e) => setGround(e.target.value)}
+                  onChange={(e) => setGround(capitalizeName(e.target.value))}
                   darkMode={darkMode}
                 />
               </FormColumn>
@@ -2083,7 +2342,7 @@ export default function App() {
                   <Input 
                     placeholder="Striker batsman" 
                     value={setupStriker} 
-                    onChange={(e) => setSetupStriker(e.target.value)}
+                    onChange={(e) => setSetupStriker(capitalizeName(e.target.value))}
                     darkMode={darkMode}
                   />
                   <Button onClick={() => setSquadModalOpen(true)}>
@@ -2097,7 +2356,7 @@ export default function App() {
                   <Input 
                     placeholder="Non-striker batsman" 
                     value={setupNonStriker} 
-                    onChange={(e) => setSetupNonStriker(e.target.value)}
+                    onChange={(e) => setSetupNonStriker(capitalizeName(e.target.value))}
                     darkMode={darkMode}
                   />
                   <Button onClick={() => setSquadModalOpen(true)}>
@@ -2111,7 +2370,7 @@ export default function App() {
                   <Input 
                     placeholder="Bowler" 
                     value={setupBowler} 
-                    onChange={(e) => setSetupBowler(e.target.value)}
+                    onChange={(e) => setSetupBowler(capitalizeName(e.target.value))}
                     darkMode={darkMode}
                   />
                   <Button onClick={() => setBowlerSelectionOpen(true)}>
@@ -2161,7 +2420,7 @@ export default function App() {
                   <Input 
                     placeholder="Player name" 
                     value={newPlayerName} 
-                    onChange={(e) => setNewPlayerName(e.target.value)}
+                    onChange={(e) => setNewPlayerName(capitalizeName(e.target.value))}
                     darkMode={darkMode}
                   />
                 </FormColumn>
@@ -2204,7 +2463,7 @@ export default function App() {
                   <Input 
                     placeholder="New bowler name" 
                     value={newBowlerName} 
-                    onChange={(e) => setNewBowlerName(e.target.value)}
+                    onChange={(e) => setNewBowlerName(capitalizeName(e.target.value))}
                     darkMode={darkMode}
                   />
                 </FormColumn>
@@ -2275,7 +2534,25 @@ export default function App() {
           <div>Score</div>
           <ScoreMain highlight={highlightMilestone}>{totalRuns}/{totalWickets}</ScoreMain>
           <ScoreDetails>{formatOvers(balls)} overs {oversLimitNum ? `of ${oversLimitNum}` : ""}</ScoreDetails>
-          <ScoreDetails>Extras: {extras}</ScoreDetails>
+          
+          {/* Required runs display for second innings */}
+          {innings === 2 && target && (
+            <RequiredRunsDisplay>
+              {calculateRequiredRunsAndBalls().runs} runs required of {calculateRequiredRunsAndBalls().balls} balls
+            </RequiredRunsDisplay>
+          )}
+          
+          {/* Extras breakdown */}
+          <ScoreDetails>
+            <div>Extras: {Object.values(extrasBreakdown).reduce((sum, val) => sum + val, 0)}</div>
+            <ExtrasBreakdown>
+              {extrasBreakdown.wides > 0 && <ExtraItem>Wide: {extrasBreakdown.wides}</ExtraItem>}
+              {extrasBreakdown.noBalls > 0 && <ExtraItem>No Ball: {extrasBreakdown.noBalls}</ExtraItem>}
+              {extrasBreakdown.byes > 0 && <ExtraItem>Bye: {extrasBreakdown.byes}</ExtraItem>}
+              {extrasBreakdown.legByes > 0 && <ExtraItem>Leg Bye: {extrasBreakdown.legByes}</ExtraItem>}
+              {extrasBreakdown.negative > 0 && <ExtraItem>Negative: {extrasBreakdown.negative}</ExtraItem>}
+            </ExtrasBreakdown>
+          </ScoreDetails>
           
           <RunRateDisplay>
             <RunRateItem>
@@ -2304,12 +2581,70 @@ export default function App() {
           </PartnershipDisplay>
         )}
 
-        {/* Run Rate Chart */}
+        {/* Scoring Actions Card - replacing Run Rate Chart */}
         <Card darkMode={darkMode}>
-          <CardTitle darkMode={darkMode}>Run Rate Progression</CardTitle>
-          <ChartContainer>
-            <Line data={runRateData} options={chartOptions} />
-          </ChartContainer>
+          <CardTitle darkMode={darkMode}>Scoring Actions</CardTitle>
+          <ActionButtons>
+            <RunButton run={0} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 0 })} animate={animateBall}>
+              🏏 0
+            </RunButton>
+            <RunButton run={1} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 1 })} animate={animateBall}>
+              🏏 1
+            </RunButton>
+            <RunButton run={2} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 2 })} animate={animateBall}>
+              🏏 2
+            </RunButton>
+            <RunButton run={3} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 3 })} animate={animateBall}>
+              🏏 3
+            </RunButton>
+            <RunButton run={4} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 4 })} animate={animateBall}>
+              🏏 4
+            </RunButton>
+            <RunButton run={6} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 6 })} animate={animateBall}>
+              🏏 6
+            </RunButton>
+            <Button onClick={() => setManualRunsOpen(true)}>
+              📝 Manual
+            </Button>
+          </ActionButtons>
+          
+          <ActionButtons>
+            <WicketButton onClick={openWicketPanel}>
+              🎯 Wicket
+            </WicketButton>
+            <ExtrasButton onClick={() => { 
+              const r = parseInt(window.prompt("Wide runs (default 1):", "1") || "1", 10) || 1; 
+              recordDeliveryWithAnimation({ type: "wide", runs: r }); 
+            }}>
+              📏 Wide
+            </ExtrasButton>
+            <ExtrasButton onClick={() => { 
+              const r = parseInt(window.prompt("No-ball runs (default 1):", "1") || "1", 10) || 1; 
+              recordDeliveryWithAnimation({ type: "noball", runs: r }); 
+            }}>
+              ⚡ No Ball
+            </ExtrasButton>
+            <ExtrasButton onClick={() => { 
+              const r = parseInt(window.prompt("Bye runs (default 1):", "1") || "1", 10) || 1; 
+              recordDeliveryWithAnimation({ type: "bye", runs: r }); 
+            }}>
+              ➡️ Bye
+            </ExtrasButton>
+            <ExtrasButton onClick={() => { 
+              const r = parseInt(window.prompt("Leg-bye runs (default 1):", "1") || "1", 10) || 1; 
+              recordDeliveryWithAnimation({ type: "legbye", runs: r }); 
+            }}>
+              ↗️ Leg Bye
+            </ExtrasButton>
+          </ActionButtons>
+          
+          <ActionButtons>
+            <Button onClick={undo}>↩️ Undo</Button>
+            <Button onClick={() => retire("S")}>🏃 Retire Striker</Button>
+            <Button onClick={() => retire("N")}>🏃 Retire Non-Striker</Button>
+            <Button onClick={swapBats}>🔄 Swap Batsmen</Button>
+            <Button onClick={changeBowler}>🎯 Change Bowler</Button>
+          </ActionButtons>
         </Card>
 
         <MobileScorecard>
@@ -2344,11 +2679,6 @@ export default function App() {
                       </tr>
                     );
                   })}
-                  <tr>
-                    <td><strong>Extras</strong></td>
-                    <td>{extras}</td>
-                    <td colSpan="5"></td>
-                  </tr>
                 </tbody>
               </Table>
             </TableContainer>
@@ -2356,71 +2686,6 @@ export default function App() {
             <div style={{ marginBottom: '1rem' }}>
               <strong>Current Bowler:</strong> {currentBowler}
             </div>
-            
-            <CardTitle style={{ fontSize: '1.1rem' }} darkMode={darkMode}>Scoring Actions</CardTitle>
-            <ActionButtons>
-              <RunButton run={0} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 0 })} animate={animateBall}>
-                🏏 0
-              </RunButton>
-              <RunButton run={1} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 1 })} animate={animateBall}>
-                🏏 1
-              </RunButton>
-              <RunButton run={2} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 2 })} animate={animateBall}>
-                🏏 2
-              </RunButton>
-              <RunButton run={3} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 3 })} animate={animateBall}>
-                🏏 3
-              </RunButton>
-              <RunButton run={4} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 4 })} animate={animateBall}>
-                🏏 4
-              </RunButton>
-              <RunButton run={6} onClick={() => recordDeliveryWithAnimation({ type: "run", runs: 6 })} animate={animateBall}>
-                🏏 6
-              </RunButton>
-              <Button onClick={() => setManualRunsOpen(true)}>
-                📝 Manual
-              </Button>
-            </ActionButtons>
-            
-            <CardTitle style={{ fontSize: '1.1rem' }} darkMode={darkMode}>Wicket & Extras</CardTitle>
-            <ActionButtons>
-              <WicketButton onClick={openWicketPanel}>
-                🎯 Wicket
-              </WicketButton>
-              <ExtrasButton onClick={() => { 
-                const r = parseInt(window.prompt("Wide runs (default 1):", "1") || "1", 10) || 1; 
-                recordDeliveryWithAnimation({ type: "wide", runs: r }); 
-              }}>
-                📏 Wide
-              </ExtrasButton>
-              <ExtrasButton onClick={() => { 
-                const r = parseInt(window.prompt("No-ball runs (default 1):", "1") || "1", 10) || 1; 
-                recordDeliveryWithAnimation({ type: "noball", runs: r }); 
-              }}>
-                ⚡ No Ball
-              </ExtrasButton>
-              <ExtrasButton onClick={() => { 
-                const r = parseInt(window.prompt("Bye runs (default 1):", "1") || "1", 10) || 1; 
-                recordDeliveryWithAnimation({ type: "bye", runs: r }); 
-              }}>
-                ➡️ Bye
-              </ExtrasButton>
-              <ExtrasButton onClick={() => { 
-                const r = parseInt(window.prompt("Leg-bye runs (default 1):", "1") || "1", 10) || 1; 
-                recordDeliveryWithAnimation({ type: "legbye", runs: r }); 
-              }}>
-                ↗️ Leg Bye
-              </ExtrasButton>
-            </ActionButtons>
-            
-            <CardTitle style={{ fontSize: '1.1rem' }} darkMode={darkMode}>Match Controls</CardTitle>
-            <ActionButtons>
-              <Button onClick={undo}>↩️ Undo</Button>
-              <Button onClick={() => retire("S")}>🏃 Retire Striker</Button>
-              <Button onClick={() => retire("N")}>🏃 Retire Non-Striker</Button>
-              <Button onClick={swapBats}>🔄 Swap Batsmen</Button>
-              <Button onClick={changeBowler}>🎯 Change Bowler</Button>
-            </ActionButtons>
           </MobileCard>
           
           <MobileCard darkMode={darkMode}>
@@ -2455,6 +2720,30 @@ export default function App() {
             <div style={{ marginTop: '1rem' }}>
               <strong>Overs:</strong> {formatOvers(balls)}
             </div>
+            
+            {/* Over Details Table */}
+            <CardTitle darkMode={darkMode}>Current Over Details</CardTitle>
+            <OverDetailsTable darkMode={darkMode}>
+              <thead>
+                <tr>
+                  <th className="ball-cell">1</th>
+                  <th className="ball-cell">2</th>
+                  <th className="ball-cell">3</th>
+                  <th className="ball-cell">4</th>
+                  <th className="ball-cell">5</th>
+                  <th className="ball-cell">6</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {currentOverBalls.map((ball, index) => (
+                    <td key={index} className="runs-cell">
+                      {ball !== null ? ball : "-"}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </OverDetailsTable>
           </MobileCard>
         </MobileScorecard>
       </MainContent>
@@ -2482,65 +2771,21 @@ export default function App() {
               <h3>Manual Runs</h3>
             </ManualRunsHeader>
             
-            <RunsButtonGrid>
-              <RunsButton onClick={() => { 
-                recordDeliveryWithAnimation({ type: "manual", runs: 0 }); 
-                setManualRunsOpen(false); 
-              }}>
-                0
-              </RunsButton>
-              <RunsButton onClick={() => { 
-                recordDeliveryWithAnimation({ type: "manual", runs: 1 }); 
-                setManualRunsOpen(false); 
-              }}>
-                1
-              </RunsButton>
-              <RunsButton onClick={() => { 
-                recordDeliveryWithAnimation({ type: "manual", runs: 2 }); 
-                setManualRunsOpen(false); 
-              }}>
-                2
-              </RunsButton>
-              <RunsButton onClick={() => { 
-                recordDeliveryWithAnimation({ type: "manual", runs: 3 }); 
-                setManualRunsOpen(false); 
-              }}>
-                3
-              </RunsButton>
-              <RunsButton onClick={() => { 
-                recordDeliveryWithAnimation({ type: "manual", runs: 4 }); 
-                setManualRunsOpen(false); 
-              }}>
-                4
-              </RunsButton>
-              <RunsButton onClick={() => { 
-                recordDeliveryWithAnimation({ type: "manual", runs: 6 }); 
-                setManualRunsOpen(false); 
-              }}>
-                6
-              </RunsButton>
-              <RunsButton negative onClick={() => { 
-                recordDeliveryWithAnimation({ type: "manual", runs: -1 }); 
-                setManualRunsOpen(false); 
-              }}>
-                -1
-              </RunsButton>
-              <RunsButton negative onClick={() => { 
-                recordDeliveryWithAnimation({ type: "manual", runs: -2 }); 
-                setManualRunsOpen(false); 
-              }}>
-                -2
-              </RunsButton>
-              <RunsButton negative onClick={() => { 
-                recordDeliveryWithAnimation({ type: "manual", runs: -3 }); 
-                setManualRunsOpen(false); 
-              }}>
-                -3
-              </RunsButton>
-            </RunsButtonGrid>
+            <FormRow>
+              <FormColumn>
+                <Input 
+                  type="number" 
+                  placeholder="Enter runs" 
+                  value={manualRunsValue} 
+                  onChange={(e) => setManualRunsValue(e.target.value)}
+                  darkMode={darkMode}
+                />
+              </FormColumn>
+            </FormRow>
             
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
               <Button onClick={() => setManualRunsOpen(false)}>Cancel</Button>
+              <Button primary onClick={handleManualRunsSubmit}>Submit</Button>
             </div>
           </ManualRunsModal>
         </Modal>
@@ -2607,7 +2852,7 @@ export default function App() {
                   <label>Who helped (optional):</label>
                   <Input 
                     value={wicketForm.helper} 
-                    onChange={(e) => setWicketForm((w) => ({ ...w, helper: e.target.value }))} 
+                    onChange={(e) => setWicketForm((w) => ({ ...w, helper: capitalizeName(e.target.value) }))} 
                     placeholder="fielder name / catcher etc."
                     darkMode={darkMode}
                   />
@@ -2622,9 +2867,9 @@ export default function App() {
                   <label>New batsman name (required):</label>
                   <Input 
                     value={wicketForm.newBatsman} 
-                    onChange={(e) => setWicketForm((w) => ({ ...w, newBatsman: e.target.value }))} 
+                    onChange={(e) => setWicketForm((w) => ({ ...w, newBatsman: capitalizeName(e.target.value) }))} 
                     placeholder="Enter new batsman name" 
-                    style={{ border: wicketForm.newBatsman ? '1px solid #ced4da' : '2px solid #dc3545' }}
+                    style={{ border: wicketForm.newBatsman ? '1px solid #ced4da' : '1px solid #dc3545' }}
                     darkMode={darkMode}
                   />
                   {!wicketForm.newBatsman && <small style={{ color: '#dc3545' }}>New batsman name is required</small>}
@@ -2692,7 +2937,7 @@ export default function App() {
                 <Input 
                   placeholder="New bowler name" 
                   value={newBowlerName} 
-                  onChange={(e) => setNewBowlerName(e.target.value)}
+                  onChange={(e) => setNewBowlerName(capitalizeName(e.target.value))}
                   darkMode={darkMode}
                 />
               </FormColumn>
@@ -2740,7 +2985,7 @@ export default function App() {
                 <label>Striker batsman:</label>
                 <Input 
                   value={secondStriker} 
-                  onChange={(e) => setSecondStriker(e.target.value)} 
+                  onChange={(e) => setSecondStriker(capitalizeName(e.target.value))} 
                   placeholder="Striker name"
                   darkMode={darkMode}
                 />
@@ -2749,7 +2994,7 @@ export default function App() {
                 <label>Non-striker batsman:</label>
                 <Input 
                   value={secondNonStriker} 
-                  onChange={(e) => setSecondNonStriker(e.target.value)} 
+                  onChange={(e) => setSecondNonStriker(capitalizeName(e.target.value))} 
                   placeholder="Non-striker name"
                   darkMode={darkMode}
                 />
@@ -2761,7 +3006,7 @@ export default function App() {
                 <label>Bowler:</label>
                 <Input 
                   value={secondBowler} 
-                  onChange={(e) => setSecondBowler(e.target.value)} 
+                  onChange={(e) => setSecondBowler(capitalizeName(e.target.value))} 
                   placeholder="Bowler name"
                   darkMode={darkMode}
                 />
@@ -2824,7 +3069,18 @@ export default function App() {
                           })}
                         </tbody>
                       </Table>
-                      <div style={{ marginTop: '0.5rem' }}><strong>Extras:</strong> {firstInningsDetail.extras || 0}</div>
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <strong>Extras:</strong> {firstInningsDetail.extrasBreakdown ? 
+                          Object.values(firstInningsDetail.extrasBreakdown).reduce((sum, val) => sum + val, 0) : 
+                          (firstInningsDetail.extras || 0)}
+                      </div>
+                      {firstInningsDetail.extrasBreakdown && (
+                        <div style={{ fontSize: '0.9rem', marginTop: '0.25rem' }}>
+                          (Wide: {firstInningsDetail.extrasBreakdown.wides}, No Ball: {firstInningsDetail.extrasBreakdown.noBalls}, 
+                          Bye: {firstInningsDetail.extrasBreakdown.byes}, Leg Bye: {firstInningsDetail.extrasBreakdown.legByes}, 
+                          Negative: {firstInningsDetail.extrasBreakdown.negative})
+                        </div>
+                      )}
 
                       <div style={{ marginTop: '1rem' }}>
                         <h4>Bowling</h4>
@@ -2875,7 +3131,7 @@ export default function App() {
                     </thead>
                     <tbody>
                       {Object.values(secondInningsDetail.batsmen || {}).map((b) => {
-                        const sr = b.balls > 0 ? ((b.runs / b.balls) * 100).toFixed(1) : "-";
+                        const sr = b.balls > 0 ? ((b.runs / b.balls ) * 100).toFixed(1) : "-";
                         return (
                           <tr key={b.name}>
                             <td>{b.name}</td>
@@ -2890,7 +3146,18 @@ export default function App() {
                       })}
                     </tbody>
                   </Table>
-                  <div style={{ marginTop: '0.5rem' }}><strong>Extras:</strong> {secondInningsDetail.extras || 0}</div>
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <strong>Extras:</strong> {secondInningsDetail.extrasBreakdown ? 
+                      Object.values(secondInningsDetail.extrasBreakdown).reduce((sum, val) => sum + val, 0) : 
+                      (secondInningsDetail.extras || 0)}
+                  </div>
+                  {secondInningsDetail.extrasBreakdown && (
+                    <div style={{ fontSize: '0.9rem', marginTop: '0.25rem' }}>
+                      (Wide: {secondInningsDetail.extrasBreakdown.wides}, No Ball: {secondInningsDetail.extrasBreakdown.noBalls}, 
+                      Bye: {secondInningsDetail.extrasBreakdown.byes}, Leg Bye: {secondInningsDetail.extrasBreakdown.legByes}, 
+                      Negative: {secondInningsDetail.extrasBreakdown.negative})
+                    </div>
+                  )}
 
                   <div style={{ marginTop: '1rem' }}>
                     <h4>Bowling</h4>
@@ -2928,7 +3195,7 @@ export default function App() {
                 <h3>{secondInningsDetail.resultText}</h3>
               </Card>
             </div>
-            
+                      
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
               <Button onClick={() => { setFinalModalOpen(false); setPage("setup"); }}>Return Home</Button>
               <Button primary onClick={downloadFinalPDFAndExit}>Download PDF & Return</Button>
