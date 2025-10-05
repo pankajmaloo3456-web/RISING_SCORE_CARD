@@ -882,7 +882,7 @@ const OverDetailsTable = styled.table`
   }
   
   .ball-cell {
-    width: 16.66%;
+    width: auto;
   }
   
   .runs-cell {
@@ -922,7 +922,8 @@ export default function App() {
   const [requiredRunRate, setRequiredRunRate] = useState(0);
   
   // Over details tracking
-  const [currentOverBalls, setCurrentOverBalls] = useState(Array(6).fill(null));
+  // -> now dynamic: stores every delivery (legal and extras) in order for the current over
+  const [currentOverBalls, setCurrentOverBalls] = useState([]); // each item: { text, legal }
   const [deliveryHistory, setDeliveryHistory] = useState([]);
   
   // Bowler selection modal
@@ -984,9 +985,6 @@ export default function App() {
     legByes: 0,
     negative: 0
   });
-
-  // pending negative runs (for modal)
-  const [pendingNegative, setPendingNegative] = useState(null);
 
   // wicket panel
   const [wicketPanelOpen, setWicketPanelOpen] = useState(false);
@@ -1172,7 +1170,6 @@ export default function App() {
     setTimeout(() => setAnimateBall(false), 1000);
   };
 
-  // All the existing functions remain the same
   const pushSnapshot = () => {
     const snap = {
       totalRuns,
@@ -1186,7 +1183,6 @@ export default function App() {
       oversLimitNum,
       extras: Object.values(extrasBreakdown).reduce((sum, val) => sum + val, 0),
       extrasBreakdown: clone(extrasBreakdown),
-      pendingNegative,
       innings,
       battingTeam,
       firstInningsScore,
@@ -1214,12 +1210,11 @@ export default function App() {
       legByes: 0,
       negative: 0
     });
-    setPendingNegative(snap.pendingNegative || null);
     setInnings(snap.innings || 1);
     setBattingTeam(snap.battingTeam || "");
     setFirstInningsScore(snap.firstInningsScore || null);
     setTarget(snap.target || null);
-    setCurrentOverBalls(snap.currentOverBalls || Array(6).fill(null));
+    setCurrentOverBalls(snap.currentOverBalls || []);
     setDeliveryHistory(snap.deliveryHistory || []);
   };
 
@@ -1279,7 +1274,6 @@ export default function App() {
       legByes: 0,
       negative: 0
     });
-    setPendingNegative(null);
     setOversLimitNum(oversLimit ? parseInt(oversLimit, 10) : null);
     setInnings(1);
     setBattingTeam(firstBatting);
@@ -1300,7 +1294,7 @@ export default function App() {
     });
     
     // Reset over balls
-    setCurrentOverBalls(Array(6).fill(null));
+    setCurrentOverBalls([]);
     setDeliveryHistory([]);
     
     // Add current bowler to saved list if not already there
@@ -1359,8 +1353,7 @@ export default function App() {
       legByes: 0,
       negative: 0
     });
-    setPendingNegative(null);
-
+    setOversLimitNum(oversLimit ? parseInt(oversLimit, 10) : null);
     setBattingTeam(other);
     setInnings(2);
     setStartSecondOpen(false);
@@ -1376,7 +1369,7 @@ export default function App() {
     });
     
     // Reset over balls
-    setCurrentOverBalls(Array(6).fill(null));
+    setCurrentOverBalls([]);
     setDeliveryHistory([]);
     
     // Add current bowler to saved list if not already there
@@ -1472,6 +1465,11 @@ export default function App() {
     return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   };
 
+  /**
+   * recordDelivery
+   * - now supports dynamic currentOverBalls (stores every delivery with text and whether it's legal)
+   * - extrasDelta no longer mutates bowlerStats directly (keeps negative-run/extra handling separate)
+   */
   const recordDelivery = ({ type, runs = 0, wicketDetails = null, extrasDelta = 0, skipNegativePrompt = false }) => {
     pushSnapshot();
     let r = 0;
@@ -1501,7 +1499,7 @@ export default function App() {
       newNon = tmp;
     };
 
-    // Record ball result for current over
+    // Record ball result for history
     const ballIndex = newBalls % 6;
     const deliveryData = {
       type,
@@ -1516,133 +1514,53 @@ export default function App() {
     // Add to delivery history
     newDeliveryHistory.push(deliveryData);
 
-    // Record ball result for current over display
-    if (type === "run" || type === "manual") {
-      r = Number(runs) || 0;
-      if (r >= 0) {
-        newCurrentOverBalls[ballIndex] = r;
-      } else {
-        newCurrentOverBalls[ballIndex] = `-${Math.abs(r)}`;
+    // Build a descriptive text for currentOverBalls entry
+    const buildDeliveryText = () => {
+      if (type === "run" || type === "manual") {
+        return `${runs}`;
+      } else if (type === "wicket") {
+        return "W";
+      } else if (type === "wide") {
+        return `WD${runs && runs !== 1 ? `+${runs}` : ""}`;
+      } else if (type === "noball") {
+        // show batsman runs if >1
+        const batsmanRuns = (Number(runs) || 1) - 1;
+        return `NB${batsmanRuns > 0 ? `+${batsmanRuns}` : ""}`;
+      } else if (type === "bye") {
+        return `B${runs && runs !== 1 ? `+${runs}` : ""}`;
+      } else if (type === "legbye") {
+        return `LB${runs && runs !== 1 ? `+${runs}` : ""}`;
       }
-    } else if (type === "wicket") {
-      newCurrentOverBalls[ballIndex] = "W";
-    } else if (type === "wide") {
-      newCurrentOverBalls[ballIndex] = "WD";
-    } else if (type === "noball") {
-      newCurrentOverBalls[ballIndex] = "NB";
-    } else if (type === "bye") {
-      newCurrentOverBalls[ballIndex] = "B";
-    } else if (type === "legbye") {
-      newCurrentOverBalls[ballIndex] = "LB";
-    }
+      return "-";
+    };
 
     // APPLY extrasDelta WITHOUT counting the ball (so wicket logic will handle the ball increment)
     if (extrasDelta && typeof extrasDelta === "number" && extrasDelta !== 0) {
       newTotalRuns += extrasDelta;
       newExtrasBreakdown.negative += Math.abs(extrasDelta);
-      if (currentBowler) {
-        bowlCopy[currentBowler].runs += extrasDelta;
-        // DO NOT increment bowlCopy[currentBowler].balls here — wicket logic counts the ball.
-      }
-      // DO NOT increment batsman balls or newBalls here for extrasDelta — wicket will count the ball.
+      // IMPORTANT: Do NOT mutate bowlerStats with extrasDelta (keeps negative runs separate from bowler stats)
+      // (this preserves your request: negative/manual extras should not change bowler run totals)
+      // DO NOT increment batsman balls or newBalls here for extrasDelta — wicket will count the ball if needed.
     }
 
     if (type === "run" || type === "manual") {
-      // Fixed: Define 'r' properly before using it
+      // ensure 'r' is a number
       r = Number(runs) || 0;
 
-      // handle negative manual runs: show in-app Yes/No modal (unless skipNegativePrompt)
-      if (type === "manual" && r < 0 && !skipNegativePrompt) {
-        // store pending negative and wait for user to answer
-        setPendingNegative(r);
+      // Manual deliveries: do not allow negative here (manual can't be negative)
+      if (type === "manual" && r < 0) {
+        alert("Manual runs cannot be negative. Use Wicket > Negative Runs for deductions.");
         return;
       }
 
-      // If skipNegativePrompt is true and r < 0, we apply negative runs directly (non-out path)
-      if (type === "manual" && r < 0 && skipNegativePrompt) {
-        newTotalRuns += r;
-        newExtrasBreakdown.negative += Math.abs(r);
-        if (currentBowler) {
-          bowlCopy[currentBowler].runs += r;
-          bowlCopy[currentBowler].balls += 1; // count the ball here for non-out negative
-        }
-        ensureBatsman(newStriker, batsCopy);
-        batsCopy[newStriker].balls += 1;
-        newBalls += 1;
-        // don't change batsman runs
-        setTotalRuns(newTotalRuns);
-        setTotalWickets(newTotalWickets);
-        setBalls(newBalls);
-        setBatsmen(batsCopy);
-        setBowlerStats(bowlCopy);
-        setStriker(newStriker);
-        setNonStriker(newNon);
-        setExtrasBreakdown(newExtrasBreakdown);
-        setCurrentOverBalls(newCurrentOverBalls);
-        setDeliveryHistory(newDeliveryHistory);
-        // clear pending if any
-        setPendingNegative(null);
-
-        // After applying, check innings/target conditions (if innings 2)
-        if (innings === 2 && target !== null) {
-          // if reached or exceeded target -> batting team wins
-          if (newTotalRuns >= target) {
-            // build second snapshot and open final summary
-            const secondSnapshot = {
-              battingTeam,
-              totalRuns: newTotalRuns,
-              totalWickets: newTotalWickets,
-              balls: newBalls,
-              batsmen: clone(batsCopy),
-              bowlerStats: clone(bowlCopy),
-              extras: Object.values(newExtrasBreakdown).reduce((sum, val) => sum + val, 0),
-              extrasBreakdown: newExtrasBreakdown,
-            };
-            openFinalSummary(secondSnapshot, `${battingTeam} wins! (${newTotalRuns} / ${newTotalWickets})`);
-            return;
-          }
-          // if overs finished -> determine winner or tie
-          if (oversLimitNum && newBalls >= oversLimitNum * 6) {
-            const F = firstInningsScore || 0;
-            let resultText;
-            if (newTotalRuns === F) {
-              resultText = "MATCH TIED";
-            } else {
-              const winner = newTotalRuns > F ? battingTeam : (battingTeam === team1 ? team2 : team1);
-              resultText = `${winner} wins!`;
-            }
-            const secondSnapshot = {
-              battingTeam,
-              totalRuns: newTotalRuns,
-              totalWickets: newTotalWickets,
-              balls: newBalls,
-              batsmen: clone(batsCopy),
-              bowlerStats: clone(bowlCopy),
-              extras: Object.values(newExtrasBreakdown).reduce((sum, val) => sum + val, 0),
-              extrasBreakdown: newExtrasBreakdown,
-            };
-            openFinalSummary(secondSnapshot, resultText);
-            return;
-          }
-        }
-
-        return;
-      }
-
-      // normal positive/manual >= 0 runs
+      // Normal positive/manual >= 0 runs
       newTotalRuns += r;
       ensureBatsman(newStriker, batsCopy);
 
       // count ball for normal deliveries and for manual positive
-      if (type !== "manual") {
-        batsCopy[newStriker].balls += 1;
-        if (currentBowler) bowlCopy[currentBowler].balls += 1;
-        newBalls += 1;
-      } else if (type === "manual" && r >= 0) {
-        batsCopy[newStriker].balls += 1;
-        if (currentBowler) bowlCopy[currentBowler].balls += 1;
-        newBalls += 1;
-      }
+      batsCopy[newStriker].balls += 1;
+      if (currentBowler) bowlCopy[currentBowler].balls += 1;
+      newBalls += 1;
 
       if (r > 0) {
         batsCopy[newStriker].runs += r;
@@ -1650,43 +1568,66 @@ export default function App() {
         if (r === 6) batsCopy[newStriker].sixes += 1;
       }
 
-      if (currentBowler && type !== "manual") {
-        bowlCopy[currentBowler].runs += r;
-      } else if (currentBowler && type === "manual" && r >= 0) {
+      if (currentBowler) {
         bowlCopy[currentBowler].runs += r;
       }
 
-      if (type !== "manual" && r % 2 === 1) swapLocalStrikes();
+      // Apply strike swap on odd runs (works for manual and normal runs now)
+      if (r % 2 === 1) swapLocalStrikes();
+
+      // Add the textual record for this delivery
+      newCurrentOverBalls.push({ text: buildDeliveryText(), legal: countsAsLegal });
     }
 
     else if (type === "wicket") {
-  const wd = wicketDetails || {};
-  const runOutInfo = wd.runOut || null;
+      const wd = wicketDetails || {};
+      const runOutInfo = wd.runOut || null;
 
-  // If runOut had runsBefore, apply them (this counts as part of wicket ball)
-  if (runOutInfo && Number(runOutInfo.runsBefore)) {
-    const runsBefore = Number(runOutInfo.runsBefore);
-    ensureBatsman(newStriker, batsCopy);
-    batsCopy[newStriker].runs += runsBefore;
-    batsCopy[newStriker].balls += 1;
-    newTotalRuns += runsBefore;
-    if (currentBowler) {
-      bowlCopy[currentBowler].runs += runsBefore;
-      bowlCopy[currentBowler].balls += 1;
-    }
-    newBalls += 1;
-    if (runsBefore % 2 === 1) swapLocalStrikes();
-  } else {
-    // count the legal ball for the wicket (only here)
-    newBalls += 1;
-    if (currentBowler) bowlCopy[currentBowler].balls += 1;
+      // If runOut had runsBefore, apply them (this counts as part of wicket ball)
+      if (runOutInfo && Number(runOutInfo.runsBefore)) {
+        const runsBefore = Number(runOutInfo.runsBefore);
+        ensureBatsman(newStriker, batsCopy);
+        batsCopy[newStriker].runs += runsBefore;
+        batsCopy[newStriker].balls += 1;
+        newTotalRuns += runsBefore;
+        if (currentBowler) {
+          bowlCopy[currentBowler].runs += runsBefore;
+          bowlCopy[currentBowler].balls += 1;
+        }
+        newBalls += 1;
+        if (runsBefore % 2 === 1) swapLocalStrikes();
+      } else {
+        // count the legal ball for the wicket (only here)
+        newBalls += 1;
+        if (currentBowler) bowlCopy[currentBowler].balls += 1;
 
-    // 🟢 FIX: Increment batsman balls for ALL wickets except run out (non-striker end)
-    if (runOutInfo) {
-      const end = runOutInfo.end || "Striker End";
-      const whoOutNorm = (runOutInfo.whoOut || "").toLowerCase();
-      // Only skip increment if it's run out and non-striker-end non-striker
-      if (!(end === "Non-Striker End" && whoOutNorm === "non-striker")) {
+        // 🟢 FIX: Increment batsman balls for ALL wickets except certain run out non-striker cases
+        if (runOutInfo) {
+          const end = runOutInfo.end || "Striker End";
+          const whoOutNorm = (runOutInfo.whoOut || "").toLowerCase();
+          if (!(end === "Non-Striker End" && whoOutNorm === "non-striker")) {
+            let outBatterName =
+              whoOutNorm === "striker"
+                ? startStriker
+                : whoOutNorm === "non-striker"
+                ? startNon
+                : end === "Striker End"
+                ? newStriker
+                : newNon;
+            ensureBatsman(outBatterName, batsCopy);
+            batsCopy[outBatterName].balls += 1;
+          }
+        } else {
+          // regular wicket – always increment out batsman’s balls
+          let outName = wd.outName?.trim() || newStriker;
+          ensureBatsman(outName, batsCopy);
+          batsCopy[outName].balls += 1;
+        }
+      }
+
+      if (runOutInfo) {
+        const end = runOutInfo.end || "Striker End";
+        const whoOutNorm = (runOutInfo.whoOut || "").toLowerCase();
         let outBatterName =
           whoOutNorm === "striker"
             ? startStriker
@@ -1695,88 +1636,75 @@ export default function App() {
             : end === "Striker End"
             ? newStriker
             : newNon;
+
         ensureBatsman(outBatterName, batsCopy);
-        batsCopy[outBatterName].balls += 1; // 🟢 INCREMENT BALL
-      }
-      // If run out non-striker, skip increment here
-    } else {
-      // regular wicket (bowled/caught/lbw/striker run-out etc) – always increment out batsman’s balls
-      let outName = wd.outName?.trim() || newStriker;
-      ensureBatsman(outName, batsCopy);
-      batsCopy[outName].balls += 1; // 🟢 INCREMENT BALL
-    }
-  }
+        batsCopy[outBatterName].status = `out (Run Out)`;
 
-  if (runOutInfo) {
-    const end = runOutInfo.end || "Striker End";
-    const whoOutNorm = (runOutInfo.whoOut || "").toLowerCase();
-    let outBatterName =
-      whoOutNorm === "striker"
-        ? startStriker
-        : whoOutNorm === "non-striker"
-        ? startNon
-        : end === "Striker End"
-        ? newStriker
-        : newNon;
+        const replacement = wd.newBatsman?.trim() || null;
+        const survivor = outBatterName === startStriker ? startNon : startStriker;
 
-    ensureBatsman(outBatterName, batsCopy);
-    batsCopy[outBatterName].status = `out (Run Out)`;
+        const isLastBall = countsAsLegal && newBalls > 0 && newBalls % 6 === 0;
 
-    const replacement = wd.newBatsman?.trim() || null;
-    const survivor = outBatterName === startStriker ? startNon : startStriker;
+        if (isLastBall) {
+          if (end === "Striker End") {
+            newStriker = survivor;
+            newNon = replacement || "-----";
+          } else {
+            newStriker = replacement || "-----";
+            newNon = survivor;
+          }
+        } else {
+          if (end === "Striker End") {
+            newStriker = replacement || "-----";
+            newNon = survivor;
+          } else {
+            newNon = replacement || "-----";
+            newStriker = survivor;
+          }
+        }
 
-    const isLastBall = countsAsLegal && newBalls > 0 && newBalls % 6 === 0;
+        if (replacement) {
+          batsCopy[replacement] = { name: replacement, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
+        }
 
-    if (isLastBall) {
-      if (end === "Striker End") {
-        newStriker = survivor;
-        newNon = replacement || "-----";
+        newTotalWickets += 1;
       } else {
-        newStriker = replacement || "-----";
-        newNon = survivor;
+        const method = wd.method || "Out";
+        let outName = wd.outName?.trim() || newStriker;
+        ensureBatsman(outName, batsCopy);
+        batsCopy[outName].status = `out (${method})`;
+        if (currentBowler && method !== "Run Out") bowlCopy[currentBowler].wickets += 1;
+        const replacement = wd.newBatsman?.trim();
+        if (replacement) {
+          batsCopy[replacement] = { name: replacement, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
+          if (outName === newStriker) newStriker = replacement;
+          else if (outName === newNon) newNon = replacement;
+          else newStriker = replacement;
+        } else {
+          if (outName === newStriker) newStriker = "-----";
+          else if (outName === newNon) newNon = "-----";
+        }
+        newTotalWickets += 1;
       }
-    } else {
-      if (end === "Striker End") {
-        newStriker = replacement || "-----";
-        newNon = survivor;
-      } else {
-        newNon = replacement || "-----";
-        newStriker = survivor;
-      }
-    }
 
-    if (replacement) {
-      batsCopy[replacement] = { name: replacement, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
+      // Add to over balls
+      newCurrentOverBalls.push({ text: buildDeliveryText(), legal: countsAsLegal });
     }
-
-    newTotalWickets += 1;
-  } else {
-    const method = wd.method || "Out";
-    let outName = wd.outName?.trim() || newStriker;
-    ensureBatsman(outName, batsCopy);
-    batsCopy[outName].status = `out (${method})`;
-    if (currentBowler && method !== "Run Out") bowlCopy[currentBowler].wickets += 1;
-    const replacement = wd.newBatsman?.trim();
-    if (replacement) {
-      batsCopy[replacement] = { name: replacement, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
-      if (outName === newStriker) newStriker = replacement;
-      else if (outName === newNon) newNon = replacement;
-      else newStriker = replacement;
-    } else {
-      if (outName === newStriker) newStriker = "-----";
-      else if (outName === newNon) newNon = "-----";
-    }
-    newTotalWickets += 1;
-  }
-}
-
 
     else if (type === "wide") {
       r = Number(runs) || 1;
       newTotalRuns += r;
       newExtrasBreakdown.wides += r;
       if (currentBowler) bowlCopy[currentBowler].runs += r;
-      if (r > 0 && r % 2 === 0) swapLocalStrikes();
+      // wides do NOT count as legal ball; they still get recorded in the over details array
+      newCurrentOverBalls.push({ text: buildDeliveryText(), legal: false });
+      // If runs from wides are even and cause strike change? We follow earlier logic: swap if r%2 === 0 (as your earlier code attempted)
+      if (r > 0 && r % 2 === 1) {
+        // odd wides won't change strike in most interpretations because they are extras - keep behavior consistent with your previous code (which swapped on even wides)
+      } else if (r > 0 && r % 2 === 0) {
+        // previous code swapped on even wides; keep previous behavior: swap if even
+        swapLocalStrikes();
+      }
     }
 
     else if (type === "noball") {
@@ -1802,6 +1730,8 @@ export default function App() {
       if (currentBowler) {
         bowlCopy[currentBowler].runs += r;
       }
+      
+      newCurrentOverBalls.push({ text: buildDeliveryText(), legal: false });
     }
 
     else if (type === "bye") {
@@ -1816,6 +1746,7 @@ export default function App() {
       batsCopy[newStriker].balls += 1;
       newBalls += 1;
       if (r % 2 === 1) swapLocalStrikes();
+      newCurrentOverBalls.push({ text: buildDeliveryText(), legal: true });
     }
 
     else if (type === "legbye") {
@@ -1830,6 +1761,7 @@ export default function App() {
       batsCopy[newStriker].balls += 1;
       newBalls += 1;
       if (r % 2 === 1) swapLocalStrikes();
+      newCurrentOverBalls.push({ text: buildDeliveryText(), legal: true });
     }
 
     // Check if over is complete and swap batsmen
@@ -1839,8 +1771,8 @@ export default function App() {
       newStriker = newNon;
       newNon = tmp;
       
-      // Reset over balls for next over
-      newCurrentOverBalls = Array(6).fill(null);
+      // Reset over balls for next over (dynamic reset)
+      newCurrentOverBalls = [];
       newDeliveryHistory = [];
     }
 
@@ -1869,18 +1801,14 @@ export default function App() {
     if (currentPartnership.batsman1 === newStriker || currentPartnership.batsman2 === newStriker) {
       setCurrentPartnership(prev => ({
         ...prev,
-        runs: prev.runs + r,
-        balls: prev.balls + 1
+        runs: prev.runs + (type === "run" || type === "manual" ? (Number(runs) || 0) : 0),
+        balls: prev.balls + (countsAsLegal ? 1 : 0)
       }));
     }
+    ;
     
     // Check for milestones
     checkMilestone(newTotalRuns, newTotalWickets);
-
-    // clear any pending negative if it was applied here
-    if ((extrasDelta && extrasDelta !== 0) || (type === "manual" && skipNegativePrompt && Number(runs) < 0)) {
-      setPendingNegative(null);
-    }
 
     // If innings 1 finished due to overs limit -> start second innings flow
     if (innings === 1 && oversLimitNum && newBalls >= oversLimitNum * 6) {
@@ -1966,7 +1894,7 @@ export default function App() {
     restoreSnapshot(last);
     
     // Recalculate run rates and partnership
-    const newRunRate = calculateRunRate(totalRuns, balls);
+    const newRunRate = calculateRunRate(last.totalRuns, last.balls);
     setCurrentRunRate(newRunRate);
     
     if (innings === 2) {
@@ -1976,45 +1904,9 @@ export default function App() {
     
     updatePartnership();
     
-    // Reconstruct current over balls from history
-    const ballIndex = balls % 6;
-    const overStart = balls - ballIndex;
-    const newCurrentOverBalls = Array(6).fill(null);
-    
-    // Get the deliveries for the current over from history
-    const currentOverDeliveries = history.filter(snapshot => 
-      snapshot.balls >= overStart && snapshot.balls < overStart + 6
-    );
-    
-    // Reconstruct the current over balls from history
-    currentOverDeliveries.forEach(snapshot => {
-      const ballInOver = snapshot.balls - overStart;
-      if (ballInOver >= 0 && ballInOver < 6) {
-        if (snapshot.deliveryHistory && snapshot.deliveryHistory[ballInOver]) {
-          const delivery = snapshot.deliveryHistory[ballInOver];
-          if (delivery.type === "run" || delivery.type === "manual") {
-            const r = Number(delivery.runs) || 0;
-            if (r >= 0) {
-              newCurrentOverBalls[ballInOver] = r;
-            } else {
-              newCurrentOverBalls[ballInOver] = `-${Math.abs(r)}`;
-            }
-          } else if (delivery.type === "wicket") {
-            newCurrentOverBalls[ballInOver] = "W";
-          } else if (delivery.type === "wide") {
-            newCurrentOverBalls[ballInOver] = "WD";
-          } else if (delivery.type === "noball") {
-            newCurrentOverBalls[ballInOver] = "NB";
-          } else if (delivery.type === "bye") {
-            newCurrentOverBalls[ballInOver] = "B";
-          } else if (delivery.type === "legbye") {
-            newCurrentOverBalls[ballInOver] = "LB";
-          }
-        }
-      }
-    });
-    
-    setCurrentOverBalls(newCurrentOverBalls);
+    // Reconstruct current over balls from the snapshot (simpler & robust)
+    setCurrentOverBalls(last.currentOverBalls || []);
+    setDeliveryHistory(last.deliveryHistory || []);
   };
 
   const swapBats = () => {
@@ -2029,27 +1921,27 @@ export default function App() {
   const retire = (which) => {
     pushSnapshot();
     if (which === "S") {
+      // Prompt first; only mark 'retired' if user confirms / provides replacement
+      const newName = window.prompt("Enter replacement striker name (leave empty to cancel):", "");
+      if (!newName) return; // Cancelled -> do nothing
+
       setBatsmen((prev) => {
         const copy = clone(prev);
         if (copy[striker]) copy[striker].status = "retired";
+        copy[newName] = { name: newName, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
         return copy;
       });
-      const newName = window.prompt("Enter replacement striker name:", "");
-      if (newName) {
-        setBatsmen((prev) => ({ ...prev, [newName]: { name: newName, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" } }));
-        setStriker(newName);
-      }
+      setStriker(newName);
     } else {
+      const newName = window.prompt("Enter replacement non-striker name (leave empty to cancel):", "");
+      if (!newName) return; // Cancelled
       setBatsmen((prev) => {
         const copy = clone(prev);
         if (copy[nonStriker]) copy[nonStriker].status = "retired";
+        copy[newName] = { name: newName, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" };
         return copy;
       });
-      const newName = window.prompt("Enter replacement non-striker name:", "");
-      if (newName) {
-        setBatsmen((prev) => ({ ...prev, [newName]: { name: newName, runs: 0, balls: 0, fours: 0, sixes: 0, status: "batting" } }));
-        setNonStriker(newName);
-      }
+      setNonStriker(newName);
     }
     updatePartnership();
   };
@@ -2083,6 +1975,29 @@ export default function App() {
       return;
     }
 
+    // If user selected the special Negative Runs method, ask for penalty and apply as extrasDelta
+    if (wf.method === "Negative Runs") {
+      const penaltyStr = window.prompt("Enter runs to deduct (positive number):", "1");
+      const penalty = Math.abs(Number(penaltyStr) || 0);
+      if (penalty <= 0) {
+        alert("Invalid penalty. Cancelled.");
+        return;
+      }
+
+      const wicketDetails = {
+        method: "Negative Runs",
+        helper: wf.helper,
+        newBatsman: wf.newBatsman,
+        outName: wf.outName,
+      };
+
+      setWicketPanelOpen(false);
+
+      // Apply as wicket with extrasDelta negative (deducts runs from total/extras but NOT from bowler)
+      recordDelivery({ type: "wicket", wicketDetails, extrasDelta: -penalty });
+      return;
+    }
+
     const wicketDetails = {
       method: wf.method,
       helper: wf.helper,
@@ -2099,29 +2014,16 @@ export default function App() {
 
     setWicketPanelOpen(false);
 
-    // If there is a pending negative, apply it together with the wicket (extrasDelta)
-    if (pendingNegative && Number(pendingNegative) !== 0) {
-      recordDelivery({ type: "wicket", wicketDetails, extrasDelta: pendingNegative });
-      setPendingNegative(null);
-    } else {
-      recordDelivery({ type: "wicket", wicketDetails });
-    }
-  };
-
-  const handleNegativeConfirm = (isOut) => {
-    if (!pendingNegative) return;
-    const r = pendingNegative;
-    if (isOut) {
-      // open wicket panel; pendingNegative will be applied on wicket submit
-      openWicketPanel();
-    } else {
-      // apply negative as extras (non-out path). Use skipNegativePrompt to avoid re-prompt.
-      recordDelivery({ type: "manual", runs: r, skipNegativePrompt: true });
-    }
+    // Normal wicket handling
+    recordDelivery({ type: "wicket", wicketDetails });
   };
 
   const handleManualRunsSubmit = () => {
     const runs = parseInt(manualRunsValue, 10) || 0;
+    if (runs < 0) {
+      alert("Manual runs cannot be negative. Use Wicket > Negative Runs to apply deductions.");
+      return;
+    }
     recordDeliveryWithAnimation({ type: "manual", runs });
     setManualRunsOpen(false);
     setManualRunsValue("");
@@ -2613,17 +2515,28 @@ export default function App() {
               🎯 Wicket
             </WicketButton>
             <ExtrasButton onClick={() => { 
-              const r = parseInt(window.prompt("Wide runs (default 1):", "1") || "1", 10) || 1; 
-              recordDeliveryWithAnimation({ type: "wide", runs: r }); 
-            }}>
-              📏 Wide
-            </ExtrasButton>
-            <ExtrasButton onClick={() => { 
-              const r = parseInt(window.prompt("No-ball runs (default 1):", "1") || "1", 10) || 1; 
-              recordDeliveryWithAnimation({ type: "noball", runs: r }); 
-            }}>
-              ⚡ No Ball
-            </ExtrasButton>
+  const input = window.prompt("Wide runs (default 1):", "1");
+  // If user cancelled the prompt, input will be null — do nothing
+  if (input === null) return;
+  const parsed = parseInt((input || "1").trim(), 10);
+  if (isNaN(parsed)) return; // invalid input -> do nothing
+  const r = Math.max(1, parsed);
+  recordDeliveryWithAnimation({ type: "wide", runs: r }); 
+}}>
+  📏 Wide
+</ExtrasButton>
+
+<ExtrasButton onClick={() => { 
+  const input = window.prompt("No-ball runs (default 1):", "1");
+  if (input === null) return; // user cancelled -> do nothing
+  const parsed = parseInt((input || "1").trim(), 10);
+  if (isNaN(parsed)) return;
+  const r = Math.max(1, parsed);
+  recordDeliveryWithAnimation({ type: "noball", runs: r }); 
+}}>
+  ⚡ No Ball
+</ExtrasButton>
+
             <ExtrasButton onClick={() => { 
               const r = parseInt(window.prompt("Bye runs (default 1):", "1") || "1", 10) || 1; 
               recordDeliveryWithAnimation({ type: "bye", runs: r }); 
@@ -2726,21 +2639,25 @@ export default function App() {
             <OverDetailsTable darkMode={darkMode}>
               <thead>
                 <tr>
-                  <th className="ball-cell">1</th>
-                  <th className="ball-cell">2</th>
-                  <th className="ball-cell">3</th>
-                  <th className="ball-cell">4</th>
-                  <th className="ball-cell">5</th>
-                  <th className="ball-cell">6</th>
+                  {currentOverBalls.length === 0 ? (
+                    // show 6 placeholders if no deliveries recorded yet for aesthetics
+                    Array.from({ length: 6 }).map((_, i) => <th key={i}>{i + 1}</th>)
+                  ) : (
+                    currentOverBalls.map((_, i) => <th key={i}>{i + 1}</th>)
+                  )}
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  {currentOverBalls.map((ball, index) => (
-                    <td key={index} className="runs-cell">
-                      {ball !== null ? ball : "-"}
-                    </td>
-                  ))}
+                  {currentOverBalls.length === 0 ? (
+                    Array.from({ length: 6 }).map((_, i) => <td key={i} className="runs-cell">-</td>)
+                  ) : (
+                    currentOverBalls.map((ball, index) => (
+                      <td key={index} className="runs-cell">
+                        {ball && ball.text ? ball.text : "-"}
+                      </td>
+                    ))
+                  )}
                 </tr>
               </tbody>
             </OverDetailsTable>
@@ -2779,6 +2696,7 @@ export default function App() {
                   value={manualRunsValue} 
                   onChange={(e) => setManualRunsValue(e.target.value)}
                   darkMode={darkMode}
+                  min="0"
                 />
               </FormColumn>
             </FormRow>
@@ -2788,25 +2706,6 @@ export default function App() {
               <Button primary onClick={handleManualRunsSubmit}>Submit</Button>
             </div>
           </ManualRunsModal>
-        </Modal>
-      )}
-
-      {/* Negative-run Yes/No modal */}
-      {pendingNegative !== null && !wicketPanelOpen && (
-        <Modal>
-          <ModalContent darkMode={darkMode}>
-            <ModalHeader>
-              <ModalTitle darkMode={darkMode}>Negative runs entered</ModalTitle>
-              <CloseButton onClick={() => setPendingNegative(null)}>×</CloseButton>
-            </ModalHeader>
-            <p>Negative runs: <strong>{pendingNegative}</strong></p>
-            <p>Is the batsman out?</p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-              <Button onClick={() => setPendingNegative(null)}>Cancel</Button>
-              <Button onClick={() => handleNegativeConfirm(false)}>No</Button>
-              <Button primary onClick={() => handleNegativeConfirm(true)}>Yes</Button>
-            </div>
-          </ModalContent>
         </Modal>
       )}
 
@@ -2843,6 +2742,7 @@ export default function App() {
                     <option>Hit Wicket</option>
                     <option>Handled the ball</option>
                     <option>Obstructing the field</option>
+                    <option>Negative Runs</option> {/* NEW: Negative runs as a wicket-action */}
                   </Select>
                 </FormColumn>
               </FormRow>
@@ -2913,7 +2813,7 @@ export default function App() {
             )}
             
             <WicketButtonGroup>
-              <WicketCancelButton onClick={() => { setWicketPanelOpen(false); setPendingNegative(null); }}>
+              <WicketCancelButton onClick={() => { setWicketPanelOpen(false); }}>
                 Cancel
               </WicketCancelButton>
               <WicketSubmitButton onClick={submitWicketPanel}>
